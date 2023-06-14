@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "./BoundNftAccount.sol";
 import "./interfaces/IEntity.sol";
 import "./interfaces/ILocation.sol";
+import "./interfaces/ILocationController.sol";
 import "./MetadataCid.sol";
 
 contract Entity is
@@ -27,14 +28,19 @@ contract Entity is
 
     mapping(uint256 => address) public boundAccount;
 
-    mapping(uint256 => address) public location;
+    ILocationController public locationController;
+    ILocation public startingLocation;
 
     constructor(
         string memory name,
         string memory symbol,
-        string memory _ipfsMetadataCid
+        string memory _ipfsMetadataCid,
+        ILocationController _locationController,
+        ILocation _startingLocation
     ) ERC721(name, symbol) MetadataCid(_ipfsMetadataCid) {
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        locationController = _locationController;
+        startingLocation = _startingLocation;
     }
 
     function mint(address _to, address _location) public {
@@ -46,7 +52,7 @@ contract Entity is
         // We cannot just use balanceOf to create the new tokenId because tokens
         // can be burned (destroyed), so we need a separate counter.
         uint256 newTokenId = _tokenIdTracker.current();
-        _mint(_to, newTokenId);
+        _mint(address(this), newTokenId);
 
         //Create and bind new BoundNftAccount
         BoundNftAccount newBoundAccount = new BoundNftAccount(
@@ -56,19 +62,12 @@ contract Entity is
         boundAccount[newTokenId] = address(newBoundAccount);
 
         //set location
-        location[newTokenId] = _location;
-        ILocation(_location).indexAdd(IEntity(this), newTokenId);
+        locationController.register(this, newTokenId, startingLocation);
+
+        //transfer to minter
+        transferFrom(address(this), _to, newTokenId);
 
         _tokenIdTracker.increment();
-    }
-
-    function move(uint256 _nftId, address _to) external {
-        require(msg.sender == location[_nftId], "Not current location");
-        address originalLocation = location[_nftId];
-        location[_nftId] = _to;
-
-        ILocation(originalLocation).indexRemove(IEntity(this), _nftId);
-        ILocation(_to).indexAdd(IEntity(this), _nftId);
     }
 
     function executeCall(
@@ -77,7 +76,11 @@ contract Entity is
         uint256 _value,
         bytes calldata _data
     ) external payable returns (bytes memory result) {
-        require(msg.sender == location[_nftId], "Not current location");
+        require(
+            msg.sender ==
+                address(locationController.getEntityLocation(this, _nftId)),
+            "Not current location"
+        );
         return
             BoundNftAccount(boundAccount[_nftId]).executeCall(
                 _to,
@@ -91,8 +94,8 @@ contract Entity is
         virtual
         override(IEntity, ERC721Burnable)
     {
-        //TODO: Update index on both sending location and receiving location
-        delete location[_nftId];
+        //unregister location
+        locationController.unregister(this, _nftId);
         ERC721Burnable.burn(_nftId);
     }
 
