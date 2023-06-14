@@ -28,14 +28,7 @@ interface ILocationController {
     function viewOnly_getAllLocalEntitiesFor(
         ILocation _location,
         IEntity _entityContract
-    )
-        external
-        view
-        returns (
-            uint256[] memory entityIds_,
-            address[] memory boundWallets_,
-            address[] memory owners_
-        );
+    ) external view returns (uint256[] memory entityIds_);
 
     function getEntityLocation(IEntity _entityContract, uint256 _nftId)
         external

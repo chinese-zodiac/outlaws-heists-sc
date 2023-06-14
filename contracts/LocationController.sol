@@ -44,7 +44,7 @@ contract LocationController is
         locationEntitiesIndex[_dest][_entityContract].add(_nftId);
 
         _prev.LOCATION_CONTROLLER_onDeparture(_entityContract, _nftId);
-        _prev.LOCATION_CONTROLLER_onArrival(_entityContract, _nftId);
+        _dest.LOCATION_CONTROLLER_onArrival(_entityContract, _nftId);
     }
 
     //Register a new entity, so it can move in the future.
@@ -52,25 +52,26 @@ contract LocationController is
         IEntity _entityContract,
         uint256 _nftId,
         ILocation _to
-    ) external;
+    ) external {
+        entityLocation[_entityContract][_nftId] = _to;
+        locationEntitiesIndex[_to][_entityContract].add(_nftId);
+        _to.LOCATION_CONTROLLER_onArrival(_entityContract, _nftId);
+    }
 
     //Unregister an entity, so it is no longer tracked as at a specific location.
-    function unregister(IEntity _entityContract, uint256 _nftId) external;
+    function unregister(IEntity _entityContract, uint256 _nftId) external {
+        ILocation _prev = entityLocation[_entityContract][_nftId];
+        delete entityLocation[_entityContract][_nftId];
+        locationEntitiesIndex[_prev][_entityContract].remove(_nftId);
+
+        _prev.LOCATION_CONTROLLER_onDeparture(_entityContract, _nftId);
+    }
 
     //High gas usage, view only
     function viewOnly_getAllLocalEntitiesFor(
         ILocation _location,
         IEntity _entityContract
-    )
-        external
-        view
-        override
-        returns (
-            uint256[] memory entityIds_,
-            address[] memory boundWallets_,
-            address[] memory owners_
-        )
-    {
+    ) external view override returns (uint256[] memory entityIds_) {
         //TODO: return all
         entityIds_ = locationEntitiesIndex[_location][_entityContract].values();
     }
