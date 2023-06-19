@@ -2,9 +2,10 @@
 pragma solidity >=0.8.19;
 
 import "./Entity.sol";
+import "./interfaces/ILocationController.sol";
 
 contract Gangs is Entity {
-    constructor(string memory _ipfsMetadataCid)
-        Entity("Outlaw Gangs", "GANG", _ipfsMetadataCid)
-    {}
+    constructor(
+        ILocationController _locationController
+    ) Entity("Outlaw Gangs", "GANG", _locationController) {}
 }

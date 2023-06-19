@@ -1,113 +1,100 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.19;
-import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "./MetadataCid.sol";
-import "./interfaces/IEntity.sol";
+import "@openzeppelin/contracts/interfaces/IERC721.sol";
+import "./interfaces/ILocation.sol";
 import "./interfaces/ILocationController.sol";
 
 //Permisionless LocationController
 //Anyone can implement ILocation and then allow users to init/move entities using this controller.
 //Allows the location to be looked up for entitites, so location based logic is possible for games with locations.
-contract LocationController is
-    AccessControlEnumerable,
-    MetadataCid,
-    ILocationController
-{
+contract LocationController is ILocationController {
     using EnumerableSet for EnumerableSet.UintSet;
 
-    mapping(ILocation => mapping(IEntity => EnumerableSet.UintSet)) locationEntitiesIndex;
-    mapping(IEntity => mapping(uint256 => ILocation)) entityLocation;
+    mapping(ILocation => mapping(IERC721 => EnumerableSet.UintSet)) locationEntitiesIndex;
+    mapping(IERC721 => mapping(uint256 => ILocation)) entityLocation;
 
-    modifier onlyEntityOwner(IEntity _entityContract, uint256 _nftId) {
+    modifier onlyEntityOwner(IERC721 _entity, uint256 _entityId) {
         require(
-            msg.sender == _entityContract.ownerOf(_nftId),
+            msg.sender == _entity.ownerOf(_entityId),
             "Only entity owner"
         );
         _;
     }
 
-    constructor(string memory _ipfsMetadataCid) MetadataCid(_ipfsMetadataCid) {
-        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
-    }
-
     //Moves entity from current location to new location.
     //First updates the entity's location, then calls arrival/departure hooks.
     function move(
-        IEntity _entityContract,
-        uint256 _nftId,
+        IERC721 _entity,
+        uint256 _entityId,
         ILocation _dest
-    ) external onlyEntityOwner(_entityContract, _nftId) {
-        ILocation _prev = entityLocation[_entityContract][_nftId];
-        entityLocation[_entityContract][_nftId] = _dest;
-        locationEntitiesIndex[_prev][_entityContract].remove(_nftId);
-        locationEntitiesIndex[_dest][_entityContract].add(_nftId);
+    ) external onlyEntityOwner(_entity, _entityId) {
+        ILocation _prev = entityLocation[_entity][_entityId];
+        entityLocation[_entity][_entityId] = _dest;
+        locationEntitiesIndex[_prev][_entity].remove(_entityId);
+        locationEntitiesIndex[_dest][_entity].add(_entityId);
 
-        _prev.LOCATION_CONTROLLER_onDeparture(_entityContract, _nftId);
-        _dest.LOCATION_CONTROLLER_onArrival(_entityContract, _nftId);
+        _prev.LOCATION_CONTROLLER_onDeparture(_entity, _entityId, _dest);
+        _dest.LOCATION_CONTROLLER_onArrival(_entity, _entityId, _prev);
     }
 
     //Register a new entity, so it can move in the future.
     function register(
-        IEntity _entityContract,
-        uint256 _nftId,
+        IERC721 _entity,
+        uint256 _entityId,
         ILocation _to
     ) external {
-        entityLocation[_entityContract][_nftId] = _to;
-        locationEntitiesIndex[_to][_entityContract].add(_nftId);
-        _to.LOCATION_CONTROLLER_onArrival(_entityContract, _nftId);
+        entityLocation[_entity][_entityId] = _to;
+        locationEntitiesIndex[_to][_entity].add(_entityId);
+        _to.LOCATION_CONTROLLER_onArrival(
+            _entity,
+            _entityId,
+            ILocation(address(0x0))
+        );
     }
 
     //Unregister an entity, so it is no longer tracked as at a specific location.
-    function unregister(IEntity _entityContract, uint256 _nftId) external {
-        ILocation _prev = entityLocation[_entityContract][_nftId];
-        delete entityLocation[_entityContract][_nftId];
-        locationEntitiesIndex[_prev][_entityContract].remove(_nftId);
+    function unregister(IERC721 _entity, uint256 _entityId) external {
+        ILocation _prev = entityLocation[_entity][_entityId];
+        delete entityLocation[_entity][_entityId];
+        locationEntitiesIndex[_prev][_entity].remove(_entityId);
 
-        _prev.LOCATION_CONTROLLER_onDeparture(_entityContract, _nftId);
+        _prev.LOCATION_CONTROLLER_onDeparture(
+            _entity,
+            _entityId,
+            ILocation(address(0x0))
+        );
     }
 
     //High gas usage, view only
     function viewOnly_getAllLocalEntitiesFor(
         ILocation _location,
-        IEntity _entityContract
+        IERC721 _entity
     ) external view override returns (uint256[] memory entityIds_) {
         //TODO: return all
-        entityIds_ = locationEntitiesIndex[_location][_entityContract].values();
+        entityIds_ = locationEntitiesIndex[_location][_entity].values();
     }
 
-    function getEntityLocation(IEntity _entityContract, uint256 _nftId)
-        public
-        view
-        override
-        returns (ILocation)
-    {
-        return entityLocation[_entityContract][_nftId];
+    function getEntityLocation(
+        IERC721 _entity,
+        uint256 _entityId
+    ) public view override returns (ILocation) {
+        return entityLocation[_entity][_entityId];
     }
 
     function getLocalEntityCountFor(
         ILocation _location,
-        IEntity _entityContract
+        IERC721 _entity
     ) public view override returns (uint256) {
-        return locationEntitiesIndex[_location][_entityContract].length();
+        return locationEntitiesIndex[_location][_entity].length();
     }
 
     function getLocalEntityAtIndexFor(
         ILocation _location,
-        IEntity _entityContract,
+        IERC721 _entity,
         uint256 _i
-    )
-        public
-        view
-        override
-        returns (
-            uint256 nftId_,
-            address boundAccount_,
-            address owner_
-        )
-    {
-        nftId_ = locationEntitiesIndex[_location][_entityContract].at(_i);
-        boundAccount_ = _entityContract.boundAccount(nftId_);
-        owner_ = _entityContract.ownerOf(nftId_);
+    ) public view override returns (uint256 entityId_, address owner_) {
+        entityId_ = locationEntitiesIndex[_location][_entity].at(_i);
+        owner_ = _entity.ownerOf(entityId_);
     }
 }

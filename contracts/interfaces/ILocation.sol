@@ -2,17 +2,19 @@
 // Authored by Plastic Digits
 // Credit to Pancakeswap
 pragma solidity ^0.8.19;
-import "./IEntity.sol";
+import "@openzeppelin/contracts/interfaces/IERC721.sol";
 
 interface ILocation {
     //Only callable by LOCATION_CONTROLLER
     function LOCATION_CONTROLLER_onArrival(
-        IEntity _entityContract,
-        uint256 _nftId
+        IERC721 _entity,
+        uint256 _nftId,
+        ILocation _from
     ) external;
 
     function LOCATION_CONTROLLER_onDeparture(
-        IEntity _entityContract,
-        uint256 _nftId
+        IERC721 _entity,
+        uint256 _nftId,
+        ILocation _to
     ) external;
 }
