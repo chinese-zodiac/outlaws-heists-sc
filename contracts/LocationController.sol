@@ -15,10 +15,7 @@ contract LocationController is ILocationController {
     mapping(IERC721 => mapping(uint256 => ILocation)) entityLocation;
 
     modifier onlyEntityOwner(IERC721 _entity, uint256 _entityId) {
-        require(
-            msg.sender == _entity.ownerOf(_entityId),
-            "Only entity owner"
-        );
+        require(msg.sender == _entity.ownerOf(_entityId), "Only entity owner");
         _;
     }
 
@@ -71,7 +68,6 @@ contract LocationController is ILocationController {
         ILocation _location,
         IERC721 _entity
     ) external view override returns (uint256[] memory entityIds_) {
-        //TODO: return all
         entityIds_ = locationEntitiesIndex[_location][_entity].values();
     }
 
