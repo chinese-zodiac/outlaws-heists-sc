@@ -144,4 +144,11 @@ describe("locationcontroller", function () {
     it("LocationController should revert when attempting move by non owner.", async function () {
         await expect(locationcontroller.move(entity1.address, 0, location1.address)).to.be.reverted;
     });
+    it("LocationController should allow despawn.", async function () {
+        await locationcontroller.connect(player1).despawn(entity1.address, 0);
+        const location2Entity1s =
+            await locationcontroller.viewOnly_getAllLocalEntitiesFor(location2.address, entity1.address);
+        expect(location2Entity1s.length).to.eq(1);
+
+    });
 });

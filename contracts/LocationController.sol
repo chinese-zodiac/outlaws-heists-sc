@@ -36,7 +36,11 @@ contract LocationController is ILocationController {
     }
 
     //Spawns an entity at location, so it can move in the future.
-    function spawn(IERC721 _entity, uint256 _entityId, ILocation _to) external {
+    function spawn(
+        IERC721 _entity,
+        uint256 _entityId,
+        ILocation _to
+    ) external onlyEntityOwner(_entity, _entityId) {
         require(
             entityLocation[_entity][_entityId] == ILocation(address(0x0)),
             "Entity already spawned"
@@ -51,7 +55,10 @@ contract LocationController is ILocationController {
     }
 
     //despanws an entity, so it is no longer tracked as at a specific location.
-    function despawn(IERC721 _entity, uint256 _entityId) external {
+    function despawn(
+        IERC721 _entity,
+        uint256 _entityId
+    ) external onlyEntityOwner(_entity, _entityId) {
         require(
             entityLocation[_entity][_entityId] != ILocation(address(0x0)),
             "Entity not spawned"
