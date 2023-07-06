@@ -46,10 +46,10 @@ contract Entity is
         _mint(address(this), newTokenId);
 
         //set location
-        locationController.register(this, newTokenId, _location);
+        locationController.spawn(this, newTokenId, _location);
 
         //transfer to minter
-        transferFrom(address(this), _to, newTokenId);
+        _transfer(address(this), _to, newTokenId);
 
         _tokenIdTracker.increment();
     }
@@ -58,7 +58,7 @@ contract Entity is
         uint256 _nftId
     ) public virtual override(IEntity, ERC721Burnable) {
         //unregister location
-        locationController.unregister(this, _nftId);
+        locationController.despawn(this, _nftId);
         ERC721Burnable.burn(_nftId);
     }
 

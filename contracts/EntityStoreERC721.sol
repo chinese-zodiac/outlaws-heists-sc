@@ -92,7 +92,16 @@ contract EntityStoreERC721 {
         }
     }
 
-    function getLocalERC721CountFor(
+    function getStoredERC721At(
+        IERC721 _entity,
+        uint256 _entityId,
+        IERC721 _nft,
+        uint256 _i
+    ) external view returns (uint256) {
+        return entityStoredERC721Ids[_entity][_entityId][_nft].at(_i);
+    }
+
+    function getStoredERC721CountFor(
         IERC721 _entity,
         uint256 _entityId,
         IERC721 _nft

@@ -11,14 +11,14 @@ interface ILocationController {
     function move(IERC721 _entity, uint256 _entityId, ILocation _dest) external;
 
     //Must call LOCATION_CONTROLLER_onArrival for new ILocation
-    function register(
+    function spawn(
         IERC721 _entity,
         uint256 _entityId,
         ILocation _dest
     ) external;
 
     //Must call LOCATION_CONTROLLER_onDeparture for old ILocation
-    function unregister(IERC721 _entity, uint256 _entityId) external;
+    function despawn(IERC721 _entity, uint256 _entityId) external;
 
     //High gas usage, view only
     function viewOnly_getAllLocalEntitiesFor(
@@ -40,5 +40,5 @@ interface ILocationController {
         ILocation _location,
         IERC721 _entity,
         uint256 _i
-    ) external view returns (uint256 entityId_, address owner_);
+    ) external view returns (uint256 entityId_);
 }

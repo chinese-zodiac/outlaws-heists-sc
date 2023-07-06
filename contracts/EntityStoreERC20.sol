@@ -44,15 +44,15 @@ contract EntityStoreERC20 {
         IERC20 _token,
         uint256 _wad
     ) external onlyEntitysLocation(_entity, _entityId) {
-        address depositor = _entity.ownerOf(_entityId);
         uint256 initialTokens = _token.balanceOf(address(this));
-        uint256 sharesPerToken = totalShares[_token] / initialTokens;
-        //Initialize shares per token to be SHARES_PRECISION
-        if (sharesPerToken == 0) sharesPerToken = SHARES_PRECISION;
-        _token.safeTransferFrom(depositor, address(this), _wad);
+        _token.safeTransferFrom(
+            address(locationController.getEntityLocation(_entity, _entityId)),
+            address(this),
+            _wad
+        );
         //May be different than _wad due to transfer tax/burn
         uint256 deltaTokens = _token.balanceOf(address(this)) - initialTokens;
-        uint256 newShares = deltaTokens * sharesPerToken;
+        uint256 newShares = deltaTokens * getSharesPerToken(_token);
         entityStoredERC20Shares[_entity][_entityId][_token] += newShares;
         totalShares[_token] += newShares;
     }
@@ -61,16 +61,14 @@ contract EntityStoreERC20 {
         IERC721 _entity,
         uint256 _entityId,
         IERC20 _token,
-        uint256 _shares
+        uint256 _wad
     ) external onlyEntitysLocation(_entity, _entityId) {
-        address depositor = _entity.ownerOf(_entityId);
-        uint256 sharesPerToken = totalShares[_token] /
-            _token.balanceOf(address(this));
-        entityStoredERC20Shares[_entity][_entityId][_token] -= _shares;
-        totalShares[_token] -= _shares;
+        uint256 shares = _wad * getSharesPerToken(_token);
+        entityStoredERC20Shares[_entity][_entityId][_token] -= shares;
+        totalShares[_token] -= shares;
         _token.safeTransfer(
-            depositor,
-            (_shares * sharesPerToken) / SHARES_PRECISION
+            address(locationController.getEntityLocation(_entity, _entityId)),
+            _wad
         );
     }
 
@@ -90,15 +88,18 @@ contract EntityStoreERC20 {
         entityStoredERC20Shares[_toEntity][_toEntityId][_token] += _shares;
     }
 
-    function getLocalER20SharesFor(
+    function getStoredER20WadFor(
         IERC721 _entity,
         uint256 _entityId,
         IERC20 _token
     ) external view returns (uint256) {
-        return entityStoredERC20Shares[_entity][_entityId][_token];
+        return
+            entityStoredERC20Shares[_entity][_entityId][_token] *
+            getSharesPerToken(_token);
     }
 
-    function getSharesPerToken(IERC20 _token) external view returns (uint256) {
+    function getSharesPerToken(IERC20 _token) public view returns (uint256) {
+        if (totalShares[_token] == 0) return SHARES_PRECISION;
         return totalShares[_token] / _token.balanceOf(address(this));
     }
 }

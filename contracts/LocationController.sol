@@ -35,12 +35,12 @@ contract LocationController is ILocationController {
         _dest.LOCATION_CONTROLLER_onArrival(_entity, _entityId, _prev);
     }
 
-    //Register a new entity, so it can move in the future.
-    function register(
-        IERC721 _entity,
-        uint256 _entityId,
-        ILocation _to
-    ) external {
+    //Spawns an entity at location, so it can move in the future.
+    function spawn(IERC721 _entity, uint256 _entityId, ILocation _to) external {
+        require(
+            entityLocation[_entity][_entityId] == ILocation(address(0x0)),
+            "Entity already spawned"
+        );
         entityLocation[_entity][_entityId] = _to;
         locationEntitiesIndex[_to][_entity].add(_entityId);
         _to.LOCATION_CONTROLLER_onArrival(
@@ -50,8 +50,12 @@ contract LocationController is ILocationController {
         );
     }
 
-    //Unregister an entity, so it is no longer tracked as at a specific location.
-    function unregister(IERC721 _entity, uint256 _entityId) external {
+    //despanws an entity, so it is no longer tracked as at a specific location.
+    function despawn(IERC721 _entity, uint256 _entityId) external {
+        require(
+            entityLocation[_entity][_entityId] != ILocation(address(0x0)),
+            "Entity not spawned"
+        );
         ILocation _prev = entityLocation[_entity][_entityId];
         delete entityLocation[_entity][_entityId];
         locationEntitiesIndex[_prev][_entity].remove(_entityId);
@@ -89,8 +93,7 @@ contract LocationController is ILocationController {
         ILocation _location,
         IERC721 _entity,
         uint256 _i
-    ) public view override returns (uint256 entityId_, address owner_) {
+    ) public view override returns (uint256 entityId_) {
         entityId_ = locationEntitiesIndex[_location][_entity].at(_i);
-        owner_ = _entity.ownerOf(entityId_);
     }
 }
