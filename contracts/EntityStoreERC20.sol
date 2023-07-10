@@ -2,6 +2,7 @@
 pragma solidity >=0.8.19;
 import "@openzeppelin/contracts/interfaces/IERC721.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./interfaces/ILocation.sol";
@@ -78,14 +79,29 @@ contract EntityStoreERC20 {
         IERC721 _toEntity,
         uint256 _toEntityId,
         IERC20 _token,
-        uint256 _shares
+        uint256 _wad
     )
         external
         onlyEntitysLocation(_fromEntity, _fromEntityId)
         onlyEntitysLocation(_toEntity, _toEntityId)
     {
-        entityStoredERC20Shares[_fromEntity][_fromEntityId][_token] -= _shares;
-        entityStoredERC20Shares[_toEntity][_toEntityId][_token] += _shares;
+        uint256 shares = _wad * getSharesPerToken(_token);
+        entityStoredERC20Shares[_fromEntity][_fromEntityId][_token] -= shares;
+        entityStoredERC20Shares[_toEntity][_toEntityId][_token] += shares;
+    }
+
+    function burn(
+        IERC721 _entity,
+        uint256 _entityId,
+        ERC20Burnable _token,
+        uint256 _wad
+    ) external onlyEntitysLocation(_entity, _entityId) {
+        uint256 shares = _wad * getSharesPerToken(_token);
+        entityStoredERC20Shares[_entity][_entityId][_token] -= shares;
+        totalShares[_token] -= shares;
+        _token.burn(
+            _wad
+        );
     }
 
     function getStoredER20WadFor(
@@ -94,7 +110,7 @@ contract EntityStoreERC20 {
         IERC20 _token
     ) external view returns (uint256) {
         return
-            entityStoredERC20Shares[_entity][_entityId][_token] *
+            entityStoredERC20Shares[_entity][_entityId][_token] /
             getSharesPerToken(_token);
     }
 
