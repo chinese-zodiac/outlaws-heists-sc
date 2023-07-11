@@ -27,7 +27,7 @@ describe("entityStoreErc20", function () {
             method: "hardhat_impersonateAccount",
             params: [czGnosisAddr],
         })
-        const czusdMinter = await ethers.getSigner(czGnosisAddr);
+        czusdMinter = await ethers.getSigner(czGnosisAddr);
 
         await owner.sendTransaction({
             to: czusdMinter.address,
@@ -177,6 +177,93 @@ describe("entityStoreErc20", function () {
         expect(getSharesPerToken).to.eq(10 ** 8);
         expect(totalShares).to.eq(parseEther("0.1").add(1).mul(getSharesPerToken));
         expect(getStoredCzusdFor).to.eq(parseEther("0.1"));
+    });
+    it("Should deposit for player3", async function () {
+        await locTownSquare.connect(player3).spawnGang();
+        await czusdSc.connect(player3).approve(locTownSquare.address, ethers.constants.MaxUint256);
+
+        await locTownSquare.connect(player3).depositErc20(gangs.address, 2, czusdSc.address, parseEther("0.9").sub(1));
+        let playerBal = await czusdSc.balanceOf(player3.address);
+        let locBal = await czusdSc.balanceOf(locTownSquare.address);
+        let storeBal = await czusdSc.balanceOf(entityStoreErc20.address);
+        let getSharesPerToken = await entityStoreErc20.getSharesPerToken(czusdSc.address);
+        let totalShares = await entityStoreErc20.totalShares(czusdSc.address);
+        let getStoredCzusdFor = await entityStoreErc20.getStoredER20WadFor(gangs.address, 2, czusdSc.address);
+
+        expect(playerBal).to.eq(parseEther("100").sub(parseEther("0.9").sub(1)));
+        expect(locBal).to.eq(0);
+        expect(storeBal).to.eq(parseEther("1"));
+        expect(getSharesPerToken).to.eq(10 ** 8);
+        expect(getStoredCzusdFor).to.eq(parseEther("0.9").sub(1));
+        expect(totalShares).to.eq(parseEther("1").mul(getSharesPerToken));
+    });
+    it("Should decrease shares per token with rebase up (factor of 10)", async function () {
+        await czusdSc.connect(czusdMinter).mint(entityStoreErc20.address, parseEther("9"));
+
+        let storeBal = await czusdSc.balanceOf(entityStoreErc20.address);
+        let getSharesPerToken = await entityStoreErc20.getSharesPerToken(czusdSc.address);
+        let totalShares = await entityStoreErc20.totalShares(czusdSc.address);
+        let getStoredCzusdFor0 = await entityStoreErc20.getStoredER20WadFor(gangs.address, 0, czusdSc.address);
+        let getStoredCzusdFor1 = await entityStoreErc20.getStoredER20WadFor(gangs.address, 1, czusdSc.address);
+        let getStoredCzusdFor2 = await entityStoreErc20.getStoredER20WadFor(gangs.address, 2, czusdSc.address);
+
+        expect(storeBal).to.eq(parseEther("10"));
+        expect(getSharesPerToken).to.eq(10 ** 7);
+        expect(totalShares).to.eq(parseEther("10").mul(getSharesPerToken));
+        expect(getStoredCzusdFor0).to.eq(10);
+        expect(getStoredCzusdFor1).to.eq(parseEther("0.1").mul(10));
+        expect(getStoredCzusdFor2).to.eq(parseEther("0.9").sub(1).mul(10));
+    });
+    it("Should increase shares per token with rebase down (back to origin)", async function () {
+        await czusdSc.connect(czusdMinter).burnFrom(entityStoreErc20.address, parseEther("9"));
+
+        let storeBal = await czusdSc.balanceOf(entityStoreErc20.address);
+        let getSharesPerToken = await entityStoreErc20.getSharesPerToken(czusdSc.address);
+        let totalShares = await entityStoreErc20.totalShares(czusdSc.address);
+        let getStoredCzusdFor0 = await entityStoreErc20.getStoredER20WadFor(gangs.address, 0, czusdSc.address);
+        let getStoredCzusdFor1 = await entityStoreErc20.getStoredER20WadFor(gangs.address, 1, czusdSc.address);
+        let getStoredCzusdFor2 = await entityStoreErc20.getStoredER20WadFor(gangs.address, 2, czusdSc.address);
+
+        expect(storeBal).to.eq(parseEther("1"));
+        expect(getSharesPerToken).to.eq(10 ** 8);
+        expect(totalShares).to.eq(parseEther("1").mul(getSharesPerToken));
+        expect(getStoredCzusdFor0).to.eq(1);
+        expect(getStoredCzusdFor1).to.eq(parseEther("0.1"));
+        expect(getStoredCzusdFor2).to.eq(parseEther("0.9").sub(1));
+    });
+    it("Should decrease shares per token with rebase up (factor of 4)", async function () {
+        await czusdSc.connect(czusdMinter).mint(entityStoreErc20.address, parseEther("3"));
+
+        let storeBal = await czusdSc.balanceOf(entityStoreErc20.address);
+        let getSharesPerToken = await entityStoreErc20.getSharesPerToken(czusdSc.address);
+        let totalShares = await entityStoreErc20.totalShares(czusdSc.address);
+        let getStoredCzusdFor0 = await entityStoreErc20.getStoredER20WadFor(gangs.address, 0, czusdSc.address);
+        let getStoredCzusdFor1 = await entityStoreErc20.getStoredER20WadFor(gangs.address, 1, czusdSc.address);
+        let getStoredCzusdFor2 = await entityStoreErc20.getStoredER20WadFor(gangs.address, 2, czusdSc.address);
+
+        expect(storeBal).to.eq(parseEther("4"));
+        expect(getSharesPerToken).to.eq(10 ** 8 / 4);
+        expect(totalShares).to.eq(parseEther("4").mul(getSharesPerToken));
+        expect(getStoredCzusdFor0).to.eq(4);
+        expect(getStoredCzusdFor1).to.eq(parseEther("0.1").mul(4));
+        expect(getStoredCzusdFor2).to.eq(parseEther("0.9").sub(1).mul(4));
+    });
+    it("Should increase shares per token with rebase down (back to 2x)", async function () {
+        await czusdSc.connect(czusdMinter).burnFrom(entityStoreErc20.address, parseEther("2"));
+
+        let storeBal = await czusdSc.balanceOf(entityStoreErc20.address);
+        let getSharesPerToken = await entityStoreErc20.getSharesPerToken(czusdSc.address);
+        let totalShares = await entityStoreErc20.totalShares(czusdSc.address);
+        let getStoredCzusdFor0 = await entityStoreErc20.getStoredER20WadFor(gangs.address, 0, czusdSc.address);
+        let getStoredCzusdFor1 = await entityStoreErc20.getStoredER20WadFor(gangs.address, 1, czusdSc.address);
+        let getStoredCzusdFor2 = await entityStoreErc20.getStoredER20WadFor(gangs.address, 2, czusdSc.address);
+
+        expect(storeBal).to.eq(parseEther("2"));
+        expect(getSharesPerToken).to.eq(10 ** 8 / 2);
+        expect(totalShares).to.eq(parseEther("2").mul(getSharesPerToken));
+        expect(getStoredCzusdFor0).to.eq(2);
+        expect(getStoredCzusdFor1).to.eq(parseEther("0.1").mul(2));
+        expect(getStoredCzusdFor2).to.eq(parseEther("0.9").sub(1).mul(2));
     });
 
 
