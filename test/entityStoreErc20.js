@@ -101,14 +101,84 @@ describe("entityStoreErc20", function () {
         let locBal = await czusdSc.balanceOf(locTownSquare.address);
         let storeBal = await czusdSc.balanceOf(entityStoreErc20.address);
         let getSharesPerToken = await entityStoreErc20.getSharesPerToken(czusdSc.address);
+        let totalShares = await entityStoreErc20.totalShares(czusdSc.address);
         let getStoredCzusdFor = await entityStoreErc20.getStoredER20WadFor(gangs.address, 0, czusdSc.address);
 
         expect(playerBal).to.eq(parseEther("100").sub(1));
         expect(locBal).to.eq(0);
         expect(storeBal).to.eq(1);
         expect(getSharesPerToken).to.eq(10 ** 8);
+        expect(totalShares).to.eq(10 ** 8);
         expect(getStoredCzusdFor).to.eq(1);
     });
+    it("Should revert after deposit if not proper location or balance", async function () {
+        await expect(entityStoreErc20.deposit(gangs.address, 0, czusdSc.address, parseEther("1"))).to.be.revertedWith("Only entity's location");
+        await expect(entityStoreErc20.connect(player1).deposit(gangs.address, 0, czusdSc.address, parseEther("1"))).to.be.revertedWith("Only entity's location");
+        await expect(locTownSquare.connect(player1).depositErc20(gangs.address, 0, czusdSc.address, parseEther("101"))).to.be.reverted;
+        await expect(entityStoreErc20.withdraw(gangs.address, 0, czusdSc.address, parseEther("1"))).to.be.revertedWith("Only entity's location");
+        await expect(locTownSquare.connect(player1).withdrawErc20(gangs.address, 0, czusdSc.address, parseEther("1"))).to.be.reverted;
+    });
+    it("Should withdraw", async function () {
+        await locTownSquare.connect(player1).depositErc20(gangs.address, 0, czusdSc.address, parseEther("1"));
+        await locTownSquare.connect(player1).withdrawErc20(gangs.address, 0, czusdSc.address, parseEther("1"));
+        let playerBal = await czusdSc.balanceOf(player1.address);
+        let locBal = await czusdSc.balanceOf(locTownSquare.address);
+        let storeBal = await czusdSc.balanceOf(entityStoreErc20.address);
+        let getSharesPerToken = await entityStoreErc20.getSharesPerToken(czusdSc.address);
+        let totalShares = await entityStoreErc20.totalShares(czusdSc.address);
+        let getStoredCzusdFor = await entityStoreErc20.getStoredER20WadFor(gangs.address, 0, czusdSc.address);
+
+        expect(playerBal).to.eq(parseEther("100").sub(1));
+        expect(locBal).to.eq(0);
+        expect(storeBal).to.eq(1);
+        expect(getSharesPerToken).to.eq(10 ** 8);
+        expect(totalShares).to.eq(10 ** 8);
+        expect(getStoredCzusdFor).to.eq(1);
+    });
+    it("Should deposit for player2", async function () {
+        await locTownSquare.connect(player2).spawnGang();
+        await czusdSc.connect(player2).approve(locTownSquare.address, ethers.constants.MaxUint256);
+
+        await locTownSquare.connect(player2).depositErc20(gangs.address, 1, czusdSc.address, parseEther("0.1"));
+        let playerBal = await czusdSc.balanceOf(player2.address);
+        let locBal = await czusdSc.balanceOf(locTownSquare.address);
+        let storeBal = await czusdSc.balanceOf(entityStoreErc20.address);
+        let getSharesPerToken = await entityStoreErc20.getSharesPerToken(czusdSc.address);
+        let totalShares = await entityStoreErc20.totalShares(czusdSc.address);
+        let getStoredCzusdFor = await entityStoreErc20.getStoredER20WadFor(gangs.address, 1, czusdSc.address);
+
+        expect(playerBal).to.eq(parseEther("100").sub(parseEther("0.1")));
+        expect(locBal).to.eq(0);
+        expect(storeBal).to.eq(parseEther("0.1").add(1));
+        expect(getSharesPerToken).to.eq(10 ** 8);
+        expect(getStoredCzusdFor).to.eq(parseEther("0.1"));
+        expect(totalShares).to.eq(parseEther("0.1").add(1).mul(getSharesPerToken));
+    });
+    it("Should revert after deposit if not proper location or balance for player2", async function () {
+        await expect(entityStoreErc20.deposit(gangs.address, 1, czusdSc.address, parseEther("1"))).to.be.revertedWith("Only entity's location");
+        await expect(entityStoreErc20.connect(player2).deposit(gangs.address, 1, czusdSc.address, parseEther("1"))).to.be.revertedWith("Only entity's location");
+        await expect(locTownSquare.connect(player2).depositErc20(gangs.address, 1, czusdSc.address, parseEther("101"))).to.be.reverted;
+        await expect(entityStoreErc20.withdraw(gangs.address, 1, czusdSc.address, parseEther("1"))).to.be.revertedWith("Only entity's location");
+        await expect(locTownSquare.connect(player2).withdrawErc20(gangs.address, 1, czusdSc.address, parseEther("1"))).to.be.reverted;
+    });
+    it("Should withdraw for player2", async function () {
+        await locTownSquare.connect(player2).depositErc20(gangs.address, 1, czusdSc.address, parseEther("1"));
+        await locTownSquare.connect(player2).withdrawErc20(gangs.address, 1, czusdSc.address, parseEther("1"));
+        let playerBal = await czusdSc.balanceOf(player2.address);
+        let locBal = await czusdSc.balanceOf(locTownSquare.address);
+        let storeBal = await czusdSc.balanceOf(entityStoreErc20.address);
+        let getSharesPerToken = await entityStoreErc20.getSharesPerToken(czusdSc.address);
+        let totalShares = await entityStoreErc20.totalShares(czusdSc.address);
+        let getStoredCzusdFor = await entityStoreErc20.getStoredER20WadFor(gangs.address, 1, czusdSc.address);
+
+        expect(playerBal).to.eq(parseEther("100").sub(parseEther("0.1")));
+        expect(locBal).to.eq(0);
+        expect(storeBal).to.eq(parseEther("0.1").add(1));
+        expect(getSharesPerToken).to.eq(10 ** 8);
+        expect(totalShares).to.eq(parseEther("0.1").add(1).mul(getSharesPerToken));
+        expect(getStoredCzusdFor).to.eq(parseEther("0.1"));
+    });
+
 
 
 });
