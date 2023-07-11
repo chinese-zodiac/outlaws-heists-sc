@@ -136,4 +136,13 @@ contract EntityStoreERC20 is Ownable, Pausable {
             IERC20(tokenAddress).balanceOf(address(this))
         );
     }
+
+    //Emergency pause/unpause
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    function unpause() public onlyOwner {
+        _unpause();
+    }
 }
