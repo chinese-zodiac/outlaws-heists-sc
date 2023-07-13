@@ -37,7 +37,9 @@ contract EntityStoreERC721 {
         IERC721 _nft,
         uint256[] calldata _nftIds
     ) external onlyEntitysLocation(_entity, _entityId) {
-        address location = address(locationController.getEntityLocation(_entity, _entityId));
+        address location = address(
+            locationController.getEntityLocation(_entity, _entityId)
+        );
         for (uint i; i < _nftIds.length; i++) {
             _nft.transferFrom(location, address(this), _nftIds[i]);
             require(
@@ -53,7 +55,9 @@ contract EntityStoreERC721 {
         IERC721 _nft,
         uint256[] calldata _nftIds
     ) external onlyEntitysLocation(_entity, _entityId) {
-        address location = address(locationController.getEntityLocation(_entity, _entityId));
+        address location = address(
+            locationController.getEntityLocation(_entity, _entityId)
+        );
         for (uint i; i < _nftIds.length; i++) {
             _nft.transferFrom(address(this), location, _nftIds[i]);
             require(
@@ -125,5 +129,14 @@ contract EntityStoreERC721 {
         IERC721 _nft
     ) external view returns (uint256) {
         return entityStoredERC721Ids[_entity][_entityId][_nft].length();
+    }
+
+    //High gas usage, view only
+    function viewOnly_getAllStoredERC721(
+        IERC721 _entity,
+        uint256 _entityId,
+        IERC721 _nft
+    ) external view returns (uint256[] memory ids_) {
+        ids_ = entityStoredERC721Ids[_entity][_entityId][_nft].values();
     }
 }
