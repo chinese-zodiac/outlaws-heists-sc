@@ -65,7 +65,7 @@ contract LocTownSquare is LocationBase {
     ) external {
         require(msg.sender == _gang.ownerOf(_gangId), "Only gang owner");
         for (uint i; i < _ids.length; i++) {
-            _nft.safeTransferFrom(msg.sender, address(this), _ids[i]);
+            _nft.transferFrom(msg.sender, address(this), _ids[i]);
         }
         if (!_nft.isApprovedForAll(address(this), address(entityStoreERC721))) {
             _nft.setApprovalForAll(address(entityStoreERC721), true);
@@ -82,7 +82,7 @@ contract LocTownSquare is LocationBase {
         require(msg.sender == _gang.ownerOf(_gangId), "Only gang owner");
         entityStoreERC721.withdraw(_gang, _gangId, _nft, _ids);
         for (uint i; i < _ids.length; i++) {
-            _nft.safeTransferFrom(address(this), msg.sender, _ids[i]);
+            _nft.transferFrom(address(this), msg.sender, _ids[i]);
         }
     }
 }
