@@ -13,7 +13,7 @@ const { expect } = chai;
 const { parseEther, formatEther } = ethers.utils;
 
 
-describe("entityStoreErc20", function () {
+describe("entityStoreErc721", function () {
     let locationcontroller, locTownSquare, location1, location2, location3;
     let gangs;
     let owner, player1, player2, player3;
@@ -80,6 +80,10 @@ describe("entityStoreErc20", function () {
             location2.address,
             location3.address
         ], true);
+        await location1.setValidEntities([gangs.address], true);
+        await location2.setValidEntities([gangs.address], true);
+        await location3.setValidEntities([gangs.address], true);
+        await locTownSquare.setValidEntities([gangs.address], true);
 
         await gangs.grantRole(ethers.utils.id("MINTER_ROLE"), locTownSquare.address);
     });
@@ -124,28 +128,22 @@ describe("entityStoreErc20", function () {
         await expect(locTownSquare.connect(player1).depositErc721(gangs.address, 0, entity2.address, [0])).to.be.reverted;
         await expect(locTownSquare.depositErc721(gangs.address, 0, entity1.address, [0])).to.be.revertedWith("Only gang owner");
         await expect(locTownSquare.connect(player1).depositErc721(gangs.address, 1, entity1.address, [0])).to.be.reverted;
-        await expect(locTownSquare.connect(player1).depositErc721(gangs.address, 0, entity2.address, [0])).to.be.reverted;
-        await expect(locTownSquare.connect(player1).withdrawErc721(gangs.address, 0, entity1.address, [0])).to.be.reverted;
+        await expect(locTownSquare.connect(player1).depositErc721(gangs.address, 0, entity2.address, [3])).to.be.reverted;
+        await expect(locTownSquare.connect(player1).withdrawErc721(gangs.address, 0, entity1.address, [2])).to.be.reverted;
     });
     it("Should withdraw", async function () {
-        await entity2.mint(player1.address);
-        await entity2.connect(player1).setApprovalForAll(locTownSquare.address, true);
-        await locTownSquare.connect(player1).depositErc721(gangs.address, 0, entity2.address, [0]);
-        await locTownSquare.connect(player1).depositErc721(gangs.address, 0, entity1.address, [1, 0]);
+        await locTownSquare.connect(player1).withdrawErc721(gangs.address, 0, entity1.address, [1]);
         const getStoredERC721At0 = await entityStoreErc721.getStoredERC721At(gangs.address, 0, entity1.address, 0);
-        const getStoredERC721At1 = await entityStoreErc721.getStoredERC721At(gangs.address, 0, entity1.address, 1);
         const getStoredERC721CountFor = await entityStoreErc721.getStoredERC721CountFor(gangs.address, 0, entity1.address);
         const viewOnly_getAllStoredEntity1 = await entityStoreErc721.viewOnly_getAllStoredERC721(gangs.address, 0, entity1.address);
         const balanceOf = await entity1.balanceOf(entityStoreErc721.address);
         const viewOnly_getAllStoredEntity2 = await entityStoreErc721.viewOnly_getAllStoredERC721(gangs.address, 0, entity2.address);
-        expect(getStoredERC721At0).to.eq(1);
-        expect(getStoredERC721At1).to.eq(0);
-        expect(getStoredERC721CountFor).to.eq(2);
-        expect(viewOnly_getAllStoredEntity1.length).to.eq(2);
-        expect(viewOnly_getAllStoredEntity1[0]).to.eq(1);
-        expect(viewOnly_getAllStoredEntity1[1]).to.eq(0);
+        expect(getStoredERC721At0).to.eq(0);
+        expect(getStoredERC721CountFor).to.eq(1);
+        expect(viewOnly_getAllStoredEntity1.length).to.eq(1);
+        expect(viewOnly_getAllStoredEntity1[0]).to.eq(0);
         expect(viewOnly_getAllStoredEntity2.length).to.eq(1);
         expect(viewOnly_getAllStoredEntity2[0]).to.eq(0);
-        expect(balanceOf).to.eq(2);
+        expect(balanceOf).to.eq(1);
     });
 });

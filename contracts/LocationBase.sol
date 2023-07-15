@@ -11,12 +11,18 @@ contract LocationBase is ILocation, AccessControlEnumerable {
     bytes32 public constant VALID_ROUTE_SETTER =
         keccak256("VALID_ROUTE_SETTER");
 
+    bytes32 public constant VALID_ENTITY_SETTER =
+        keccak256("VALID_ENTITY_SETTER");
+
     EnumerableSet.AddressSet validSources;
     EnumerableSet.AddressSet validDestinations;
+
+    EnumerableSet.AddressSet validEntities;
 
     constructor(ILocationController _locationController) {
         locationController = _locationController;
         _grantRole(VALID_ROUTE_SETTER, msg.sender);
+        _grantRole(VALID_ENTITY_SETTER, msg.sender);
     }
 
     modifier onlyLocalEntity(IERC721 _entity, uint256 _entityId) {
@@ -37,6 +43,7 @@ contract LocationBase is ILocation, AccessControlEnumerable {
     ) external {
         require(msg.sender == address(locationController), "Sender must be LC");
         require(validSources.contains(address(_from)), "Invalid source");
+        require(validEntities.contains(address(_entity)), "Invalid entity");
     }
 
     //Only callable by LOCATION_CONTROLLER
@@ -50,6 +57,7 @@ contract LocationBase is ILocation, AccessControlEnumerable {
             validDestinations.contains(address(_to)),
             "Invalid destination"
         );
+        require(validEntities.contains(address(_entity)), "Invalid entity");
     }
 
     function setValidRoute(
@@ -65,6 +73,21 @@ contract LocationBase is ILocation, AccessControlEnumerable {
             for (uint i; i < _locations.length; i++) {
                 validSources.remove(_locations[i]);
                 validDestinations.remove(_locations[i]);
+            }
+        }
+    }
+
+    function setValidEntities(
+        address[] calldata _entities,
+        bool isValid
+    ) external onlyRole(VALID_ENTITY_SETTER) {
+        if (isValid) {
+            for (uint i; i < _entities.length; i++) {
+                validEntities.add(_entities[i]);
+            }
+        } else {
+            for (uint i; i < _entities.length; i++) {
+                validEntities.remove(_entities[i]);
             }
         }
     }
@@ -112,5 +135,25 @@ contract LocationBase is ILocation, AccessControlEnumerable {
         uint256 _i
     ) external view override returns (address) {
         return validDestinations.at(_i);
+    }
+
+    //High gas usage, view only
+    function viewOnly_getAllValidEntities()
+        external
+        view
+        override
+        returns (address[] memory entities_)
+    {
+        entities_ = validEntities.values();
+    }
+
+    function getValidEntitiesCount() external view override returns (uint256) {
+        return validEntities.length();
+    }
+
+    function getValidEntitiesAt(
+        uint256 _i
+    ) external view override returns (address) {
+        return validEntities.at(_i);
     }
 }

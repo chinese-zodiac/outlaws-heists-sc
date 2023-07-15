@@ -36,4 +36,13 @@ interface ILocation {
     function getValidDestinationCount() external view returns (uint256);
 
     function getValidDestinationAt(uint256 _i) external view returns (address);
+
+    function viewOnly_getAllValidEntities()
+        external
+        view
+        returns (address[] memory entities_);
+
+    function getValidEntitiesCount() external view returns (uint256);
+
+    function getValidEntitiesAt(uint256 _i) external view returns (address);
 }
