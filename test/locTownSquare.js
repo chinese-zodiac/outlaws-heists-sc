@@ -57,4 +57,33 @@ describe("locTownSquare", function () {
 
         await gangs.grantRole(ethers.utils.id("MINTER_ROLE"), locTownSquare.address);
     });
+    it("Should revert if onArrival or onDeparture is not called by location controller", async function () {
+        await expect(locTownSquare.LOCATION_CONTROLLER_onArrival(gangs.address, 0, locTownSquare.address)).to.be.revertedWith("Sender must be LC");
+        await expect(locTownSquare.LOCATION_CONTROLLER_onDeparture(gangs.address, 0, locTownSquare.address)).to.be.revertedWith("Sender must be LC");
+
+    })
+    it("Should be invalid source if spawning and address(0x0) was not set as a valid source", async function () {
+        await expect(locTownSquare.connect(player1).spawnGang()).to.be.revertedWith("Invalid source");
+    });
+    it("Should only allow address with VALID_ROUTE_SETTER to set permissions for routes", async function () {
+        await expect(locTownSquare.connect(player1).setValidRoute([ethers.constants.AddressZero], true)).to.be.revertedWith("AccessControl: account " + player1.address.toLowerCase() + " is missing role " + ethers.utils.id("VALID_ROUTE_SETTER"));
+    });
+    it("Should be invalid entity if entity not set as valid", async function () {
+        await locTownSquare.setValidRoute([ethers.constants.AddressZero], true);
+        await expect(locTownSquare.connect(player1).spawnGang()).to.be.revertedWith("Invalid entity");
+    });
+    it("Should only allow address with VALID_ENTITY_SETTER to set permissions for routes", async function () {
+        await expect(locTownSquare.connect(player1).setValidEntities([gangs.address], true)).to.be.revertedWith("AccessControl: account " + player1.address.toLowerCase() + " is missing role " + ethers.utils.id("VALID_ENTITY_SETTER"));
+    });
+    it("Should create new gang at spawn location", async function () {
+        await locTownSquare.setValidEntities([gangs.address], true);
+        await locTownSquare.connect(player1).spawnGang();
+        const ownerOfID0 = await gangs.ownerOf(0);
+        const gangsInTownSquareScCount = await gangs.balanceOf(locTownSquare.address);
+        const allLocalGangsAtTownSquareLocation = await locationcontroller.viewOnly_getAllLocalEntitiesFor(locTownSquare.address, gangs.address);
+        expect(ownerOfID0).to.eq(player1.address);
+        expect(gangsInTownSquareScCount).to.eq(0);
+        expect(allLocalGangsAtTownSquareLocation.length).to.eq(1);
+        expect(allLocalGangsAtTownSquareLocation[0]).to.eq(0);
+    });
 });
