@@ -27,9 +27,16 @@ contract LocationController is ILocationController {
         ILocation _dest
     ) external onlyEntityOwner(_entity, _entityId) {
         ILocation _prev = entityLocation[_entity][_entityId];
+        require(_prev != _dest, "Cannot move to current location");
         entityLocation[_entity][_entityId] = _dest;
-        locationEntitiesIndex[_prev][_entity].remove(_entityId);
-        locationEntitiesIndex[_dest][_entity].add(_entityId);
+        require(
+            locationEntitiesIndex[_prev][_entity].remove(_entityId),
+            "Remove failed"
+        );
+        require(
+            locationEntitiesIndex[_dest][_entity].add(_entityId),
+            "Add failed"
+        );
 
         _prev.LOCATION_CONTROLLER_onDeparture(_entity, _entityId, _dest);
         _dest.LOCATION_CONTROLLER_onArrival(_entity, _entityId, _prev);
@@ -46,7 +53,10 @@ contract LocationController is ILocationController {
             "Entity already spawned"
         );
         entityLocation[_entity][_entityId] = _to;
-        locationEntitiesIndex[_to][_entity].add(_entityId);
+        require(
+            locationEntitiesIndex[_to][_entity].add(_entityId),
+            "Add failed"
+        );
         _to.LOCATION_CONTROLLER_onArrival(
             _entity,
             _entityId,
@@ -54,7 +64,7 @@ contract LocationController is ILocationController {
         );
     }
 
-    //despanws an entity, so it is no longer tracked as at a specific location.
+    //despawns an entity, so it is no longer tracked as at a specific location.
     function despawn(
         IERC721 _entity,
         uint256 _entityId
@@ -65,7 +75,10 @@ contract LocationController is ILocationController {
         );
         ILocation _prev = entityLocation[_entity][_entityId];
         delete entityLocation[_entity][_entityId];
-        locationEntitiesIndex[_prev][_entity].remove(_entityId);
+        require(
+            locationEntitiesIndex[_prev][_entity].remove(_entityId),
+            "Remove failed"
+        );
 
         _prev.LOCATION_CONTROLLER_onDeparture(
             _entity,

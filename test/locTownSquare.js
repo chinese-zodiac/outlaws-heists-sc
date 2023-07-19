@@ -60,7 +60,6 @@ describe("locTownSquare", function () {
     it("Should revert if onArrival or onDeparture is not called by location controller", async function () {
         await expect(locTownSquare.LOCATION_CONTROLLER_onArrival(gangs.address, 0, locTownSquare.address)).to.be.revertedWith("Sender must be LC");
         await expect(locTownSquare.LOCATION_CONTROLLER_onDeparture(gangs.address, 0, locTownSquare.address)).to.be.revertedWith("Sender must be LC");
-
     })
     it("Should be invalid source if spawning and address(0x0) was not set as a valid source", async function () {
         await expect(locTownSquare.connect(player1).spawnGang()).to.be.revertedWith("Invalid source");
@@ -85,5 +84,30 @@ describe("locTownSquare", function () {
         expect(gangsInTownSquareScCount).to.eq(0);
         expect(allLocalGangsAtTownSquareLocation.length).to.eq(1);
         expect(allLocalGangsAtTownSquareLocation[0]).to.eq(0);
+    });
+    it("Should revert move on departure when not nft owner", async function () {
+        await expect(locationcontroller.move(gangs.address, 0, location1.address)).to.be.revertedWith("Only entity owner");
+    });
+    it("Should revert move on departure to invalid location", async function () {
+        await expect(locationcontroller.connect(player1).move(gangs.address, 0, location1.address)).to.be.revertedWith("Invalid destination");
+    });
+    it("Should move to new location", async function () {
+        await location1.setValidEntities([gangs.address], true);
+        await location1.setValidRoute([locTownSquare.address], true);
+        await locTownSquare.setValidRoute([location1.address], true);
+
+        await locationcontroller.connect(player1).move(gangs.address, 0, location1.address);
+
+        const ownerOfID0 = await gangs.ownerOf(0);
+        const allLocalGangsAtTownSquareLocation = await locationcontroller.viewOnly_getAllLocalEntitiesFor(locTownSquare.address, gangs.address);
+        const allLocalGangsAtLocation1 = await locationcontroller.viewOnly_getAllLocalEntitiesFor(location1.address, gangs.address);
+        expect(ownerOfID0).to.eq(player1.address);
+        expect(allLocalGangsAtTownSquareLocation.length).to.eq(0);
+        expect(allLocalGangsAtLocation1.length).to.eq(1);
+        expect(allLocalGangsAtLocation1[0]).to.eq(0);
+    });
+    it("Should revert move on arrival from invalid location", async function () {
+        await locTownSquare.setValidRoute([location1.address], false);
+        await expect(locationcontroller.connect(player1).move(gangs.address, 0, locTownSquare.address)).to.be.revertedWith("Invalid source");
     });
 });
