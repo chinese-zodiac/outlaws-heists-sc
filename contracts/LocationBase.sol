@@ -6,8 +6,9 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 
 contract LocationBase is ILocation, AccessControlEnumerable {
-    ILocationController immutable locationController;
     using EnumerableSet for EnumerableSet.AddressSet;
+
+    ILocationController immutable locationController;
     bytes32 public constant VALID_ROUTE_SETTER =
         keccak256("VALID_ROUTE_SETTER");
 
