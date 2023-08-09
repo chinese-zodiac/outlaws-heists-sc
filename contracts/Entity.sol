@@ -35,7 +35,7 @@ contract Entity is
         locationController = _locationController;
     }
 
-    function mint(address _to, ILocation _location) public {
+    function mint(address _to, ILocation _location) public returns (uint256 id_) {
         require(
             hasRole(MINTER_ROLE, _msgSender()),
             "JNT: must have manager role to mint"
@@ -53,6 +53,8 @@ contract Entity is
         _transfer(address(this), _to, newTokenId);
 
         _tokenIdTracker.increment();
+
+        return newTokenId;
     }
 
     function burn(
