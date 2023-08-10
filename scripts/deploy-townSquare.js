@@ -35,6 +35,11 @@ async function main() {
     await delay(5000);
     await gangs.grantRole(ethers.utils.id("MINTER_ROLE"), townSquare.address);
     console.log("MINTER_ROLE gratned to TownSquare");
+
+    console.log("waiting 5 seconds");
+    await delay(5000);
+    await townSquare.setValidEntities([gangs.address], true);
+    console.log("setValidEntities set to TRUE for gangs address");
 }
 
 // We recommend this pattern to be able to use async/await everywhere

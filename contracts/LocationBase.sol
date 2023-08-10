@@ -41,7 +41,7 @@ contract LocationBase is ILocation, AccessControlEnumerable {
         IERC721 _entity,
         uint256 _entityId,
         ILocation _from
-    ) external {
+    ) external virtual {
         require(msg.sender == address(locationController), "Sender must be LC");
         require(validSources.contains(address(_from)), "Invalid source");
         require(validEntities.contains(address(_entity)), "Invalid entity");
@@ -52,7 +52,7 @@ contract LocationBase is ILocation, AccessControlEnumerable {
         IERC721 _entity,
         uint256 _entityId,
         ILocation _to
-    ) external {
+    ) external virtual {
         require(msg.sender == address(locationController), "Sender must be LC");
         require(
             validDestinations.contains(address(_to)),
@@ -64,7 +64,7 @@ contract LocationBase is ILocation, AccessControlEnumerable {
     function setValidRoute(
         address[] calldata _locations,
         bool isValid
-    ) external onlyRole(VALID_ROUTE_SETTER) {
+    ) public onlyRole(VALID_ROUTE_SETTER) {
         if (isValid) {
             for (uint i; i < _locations.length; i++) {
                 validSources.add(_locations[i]);
@@ -81,7 +81,7 @@ contract LocationBase is ILocation, AccessControlEnumerable {
     function setValidEntities(
         address[] calldata _entities,
         bool isValid
-    ) external onlyRole(VALID_ENTITY_SETTER) {
+    ) public onlyRole(VALID_ENTITY_SETTER) {
         if (isValid) {
             for (uint i; i < _entities.length; i++) {
                 validEntities.add(_entities[i]);
@@ -103,13 +103,13 @@ contract LocationBase is ILocation, AccessControlEnumerable {
         locations_ = validSources.values();
     }
 
-    function getValidSourceCount() external view override returns (uint256) {
+    function getValidSourceCount() public view override returns (uint256) {
         return validSources.length();
     }
 
     function getValidSourceAt(
         uint256 _i
-    ) external view override returns (address) {
+    ) public view override returns (address) {
         return validSources.at(_i);
     }
 
@@ -123,18 +123,13 @@ contract LocationBase is ILocation, AccessControlEnumerable {
         locations_ = validDestinations.values();
     }
 
-    function getValidDestinationCount()
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function getValidDestinationCount() public view override returns (uint256) {
         return validDestinations.length();
     }
 
     function getValidDestinationAt(
         uint256 _i
-    ) external view override returns (address) {
+    ) public view override returns (address) {
         return validDestinations.at(_i);
     }
 
@@ -148,13 +143,13 @@ contract LocationBase is ILocation, AccessControlEnumerable {
         entities_ = validEntities.values();
     }
 
-    function getValidEntitiesCount() external view override returns (uint256) {
+    function getValidEntitiesCount() public view override returns (uint256) {
         return validEntities.length();
     }
 
     function getValidEntitiesAt(
         uint256 _i
-    ) external view override returns (address) {
+    ) public view override returns (address) {
         return validEntities.at(_i);
     }
 }

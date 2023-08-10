@@ -35,7 +35,7 @@ contract Entity is
         locationController = _locationController;
     }
 
-    function mint(address _to, ILocation _location) public returns (uint256 id_) {
+    function mint(address _to, ILocation _location) public virtual returns (uint256 id_) {
         require(
             hasRole(MINTER_ROLE, _msgSender()),
             "JNT: must have manager role to mint"
