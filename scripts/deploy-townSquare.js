@@ -1,6 +1,6 @@
 const hre = require("hardhat");
 const loadJsonFile = require("load-json-file");
-const { LocationController, EntityStoreERC20, EntityStoreERC721, Bandits, Outlaws } = require("../deployconfig.json");
+const { LocationController, EntityStoreERC20, EntityStoreERC721, Bandits, Outlaws, Gangs } = require("../deployconfig.json");
 
 const { ethers } = hre;
 const { parseEther } = ethers.utils;
@@ -12,10 +12,12 @@ function delay(ms) {
 
 async function main() {
 
-    const Gangs = await ethers.getContractFactory("Gangs");
+    /*const Gangs = await ethers.getContractFactory("Gangs");
     const gangs = await Gangs.deploy(LocationController);
     await gangs.deployed();
-    console.log("Gangs deployed to:", gangs.address);
+    console.log("Gangs deployed to:", gangs.address);*/
+
+    const gangs = await ethers.getContractAt("Gangs", Gangs);
 
 
     const LocTownSquare = await ethers.getContractFactory("LocTownSquare");

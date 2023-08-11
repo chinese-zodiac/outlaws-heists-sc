@@ -61,6 +61,15 @@ contract LocTownSquare is LocationBase {
         bandits.safeTransfer(msg.sender, bandits.balanceOf(address(this)));
     }
 
+    function depositAndWithdrawOutlaws(
+        uint256 _gangId,
+        uint256[] calldata _idsToDeposit,
+        uint256[] calldata _idsToWithdraw
+    ) public {
+        depositOutlaws(_gangId, _idsToDeposit);
+        withdrawOutlaws(_gangId, _idsToWithdraw);
+    }
+
     function depositOutlaws(uint256 _gangId, uint256[] calldata _ids) public {
         require(msg.sender == gang.ownerOf(_gangId), "Only gang owner");
         for (uint i; i < _ids.length; i++) {
@@ -69,10 +78,7 @@ contract LocTownSquare is LocationBase {
         entityStoreERC721.deposit(gang, _gangId, outlaws, _ids);
     }
 
-    function withdrawOutlaws(
-        uint256 _gangId,
-        uint256[] calldata _ids
-    ) external {
+    function withdrawOutlaws(uint256 _gangId, uint256[] calldata _ids) public {
         require(msg.sender == gang.ownerOf(_gangId), "Only gang owner");
         entityStoreERC721.withdraw(gang, _gangId, outlaws, _ids);
         for (uint i; i < _ids.length; i++) {
