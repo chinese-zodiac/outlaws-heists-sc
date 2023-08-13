@@ -32,7 +32,7 @@ contract Gangs is Entity, Ownable {
         );
         bytes32 roll2 = keccak256(abi.encodePacked(roll1));
         bytes32 roll3 = keccak256(abi.encodePacked(roll2));
-        setName(
+        _setName(
             id_,
             uint16(uint256(roll1) % gangNameWord1OptionsMax),
             uint16(uint256(roll2) % gangNameWord2OptionsMax),
@@ -45,12 +45,21 @@ contract Gangs is Entity, Ownable {
         uint16 word1,
         uint16 word2,
         uint16 word3
-    ) public {
+    ) external {
+        require(msg.sender == ownerOf(_gangId), "Only owner can change name");
+        _setName(_gangId, word1, word2, word3);
+    }
+
+    function _setName(
+        uint256 _gangId,
+        uint16 word1,
+        uint16 word2,
+        uint16 word3
+    ) internal {
         require(word1 < gangNameWord1OptionsMax, "word1 above max");
         require(word2 < gangNameWord2OptionsMax, "word2 above max");
-        require(word1 < gangNameWord3OptionsMax, "word3 above max");
-        require(msg.sender == ownerOf(_gangId), "Only owner can change name");
-        uint256 name = ((word1 + word2) << (16 + word3)) << 32;
+        require(word3 < gangNameWord3OptionsMax, "word3 above max");
+        uint256 name = word1 + (uint256(word2) << 16) + (uint256(word3) << 32);
         require(gangNames.add(name), "Add name failed");
         gangIdToName[_gangId] = name;
     }
@@ -60,8 +69,8 @@ contract Gangs is Entity, Ownable {
     ) external view returns (uint256 word1_, uint256 word2_, uint256 word3_) {
         uint256 name = gangIdToName[_gangId];
         word3_ = name >> 32;
-        word2_ = (name >> (16 - word3_)) << 16;
-        word1_ = ((name - word3_) << (32 - word2_)) << 16;
+        word2_ = (name >> 16) - (word3_ << 16);
+        word1_ = name - (word3_ << 32) - (word2_ << 16);
     }
 
     function setMaxOptions(

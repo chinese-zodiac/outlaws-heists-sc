@@ -1,6 +1,6 @@
 const hre = require("hardhat");
 const loadJsonFile = require("load-json-file");
-const { LocationController, EntityStoreERC20, EntityStoreERC721, Bandits, Outlaws, Gangs } = require("../deployconfig.json");
+const { LocationController, EntityStoreERC20, EntityStoreERC721, Bandits, Outlaws } = require("../deployconfig.json");
 
 const { ethers } = hre;
 const { parseEther } = ethers.utils;
@@ -12,12 +12,10 @@ function delay(ms) {
 
 async function main() {
 
-    /*const Gangs = await ethers.getContractFactory("Gangs");
+    const Gangs = await ethers.getContractFactory("Gangs");
     const gangs = await Gangs.deploy(LocationController);
     await gangs.deployed();
-    console.log("Gangs deployed to:", gangs.address);*/
-
-    const gangs = await ethers.getContractAt("Gangs", Gangs);
+    console.log("Gangs deployed to:", gangs.address);
 
 
     const LocTownSquare = await ethers.getContractFactory("LocTownSquare");
@@ -36,12 +34,23 @@ async function main() {
     console.log("waiting 5 seconds");
     await delay(5000);
     await gangs.grantRole(ethers.utils.id("MINTER_ROLE"), townSquare.address);
-    console.log("MINTER_ROLE gratned to TownSquare");
+    console.log("MINTER_ROLE granted to TownSquare");
+
+    console.log("waiting 5 seconds");
+    await delay(5000);
+    await gangs.setMaxOptions(432, 432, 336);
+    console.log("setMaxOptions set for gang names");
 
     console.log("waiting 5 seconds");
     await delay(5000);
     await townSquare.setValidEntities([gangs.address], true);
     console.log("setValidEntities set to TRUE for gangs address");
+
+    console.log("waiting 5 seconds");
+    await delay(5000);
+    await townSquare.setValidRoute([ethers.constants.AddressZero], true);
+    console.log("setValidRoute set to TRUE for zero address");
+
 }
 
 // We recommend this pattern to be able to use async/await everywhere
