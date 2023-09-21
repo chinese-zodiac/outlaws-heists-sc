@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.19;
 
-import "@openzeppelin/contracts/utils/Checkpoints.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@chainlink/contracts/src/v0.8/VRFV2WrapperConsumerBase.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorInterface.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import "./libs/CheckpointTimestamps.sol";
 import "./interfaces/IAmmRouter02.sol";
 import "./interfaces/IPegSwap.sol";
 
 contract RngHistory is VRFV2WrapperConsumerBase, AccessControlEnumerable {
-    using Checkpoints for Checkpoints.Trace224;
+    using CheckpointTimestamps for CheckpointTimestamps.History;
     using SafeERC20 for IERC20;
     using Address for address;
 
-    Checkpoints.Trace224 rngHistory;
+    CheckpointTimestamps.History rngHistory;
 
     bool public _isRequestPending;
     address public constant LINK_TRADEABLE =
@@ -102,25 +102,25 @@ contract RngHistory is VRFV2WrapperConsumerBase, AccessControlEnumerable {
     }
 
     /**
-     * @dev Returns the first value at or after a given block number. If a checkpoint is not available at that block, the closest one
-     * before it is returned, or zero otherwise. Because the number returned corresponds to that at the end of the
-     * block, the requested block number must be in the past, excluding the current block.
+     * @dev Returns the first value at or after a given block timestamp. If a checkpoint is not available at that block, the closest one
+     * before it is returned, or zero otherwise. Because the timestamp returned corresponds to that at the end of the
+     * block, the requested block timestamp must be in the past, excluding the current block.
      */
-    function getAtOrAfterBlock(
-        uint32 blockNumber
+    function getAtOrAfterTimestamp(
+        uint64 timestamp
     ) external view returns (uint256) {
-        return rngHistory.lowerLookup(blockNumber);
+        return rngHistory.lowerLookup(timestamp);
     }
 
     /**
-     * @dev Returns the first value at or before a given block number. If a checkpoint is not available at that block, the closest one
-     * before it is returned, or zero otherwise. Because the number returned corresponds to that at the end of the
-     * block, the requested block number must be in the past, excluding the current block.
+     * @dev Returns the first value at or before a given block timestamp. If a checkpoint is not available at that block, the closest one
+     * before it is returned, or zero otherwise. Because the timestamp returned corresponds to that at the end of the
+     * block, the requested block timestamp must be in the past, excluding the current block.
      */
-    function getAtOrBeforeBlock(
-        uint32 blockNumber
+    function getAtOrBeforeTimestamp(
+        uint64 timestamp
     ) external view returns (uint256) {
-        return rngHistory.upperLookup(blockNumber);
+        return rngHistory.upperLookup(timestamp);
     }
 
     /**
@@ -137,13 +137,13 @@ contract RngHistory is VRFV2WrapperConsumerBase, AccessControlEnumerable {
     function latestCheckpoint()
         external
         view
-        returns (bool exists, uint32 _blockNumber, uint224 _value)
+        returns (bool exists, uint64 _timestamp, uint224 _value)
     {
         return rngHistory.latestCheckpoint();
     }
 
     /**
-     * @dev Returns the number of checkpoint.
+     * @dev Returns the count of checkpoints.
      */
     function length() external view returns (uint256) {
         return rngHistory.length();
@@ -185,6 +185,6 @@ contract RngHistory is VRFV2WrapperConsumerBase, AccessControlEnumerable {
         uint256[] memory randomWords
     ) internal override {
         _isRequestPending = false;
-        rngHistory.push(uint32(block.number), uint224(randomWords[0]));
+        rngHistory.push(uint256(randomWords[0]));
     }
 }

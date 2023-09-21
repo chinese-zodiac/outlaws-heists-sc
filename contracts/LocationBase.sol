@@ -37,6 +37,7 @@ contract LocationBase is ILocation, AccessControlEnumerable {
         _;
     }
 
+    //Only callable by LOCATION_CONTROLLER
     function LOCATION_CONTROLLER_onArrival(
         IERC721 _entity,
         uint256 _entityId,
