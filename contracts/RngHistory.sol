@@ -40,7 +40,7 @@ contract RngHistory is VRFV2WrapperConsumerBase, AccessControlEnumerable {
 
     uint256 public linkPerBnbMin = 1 ether;
 
-    uint32 public callbackGasLimit = 175000;
+    uint32 public callbackGasLimit = 350000;
 
     constructor()
         VRFV2WrapperConsumerBase(
@@ -185,6 +185,10 @@ contract RngHistory is VRFV2WrapperConsumerBase, AccessControlEnumerable {
         uint256[] memory randomWords
     ) internal override {
         _isRequestPending = false;
-        rngHistory.push(uint256(randomWords[0]));
+        rngHistory.push(uint192(randomWords[0]));
+    }
+
+    function resetRequestPending() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _isRequestPending = false;
     }
 }

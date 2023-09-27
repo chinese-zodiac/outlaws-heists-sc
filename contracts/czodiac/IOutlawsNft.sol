@@ -13,9 +13,9 @@ interface IOutlawsNft is IERC721Enumerable {
         SALOON //4
     }
 
-    function nftToken(uint256 _id) external returns (TOKEN token_);
+    function nftToken(uint256 _id) external view returns (TOKEN token_);
 
-    function nftGeneration(uint256 _id) external returns (uint256 gen_);
+    function nftGeneration(uint256 _id) external view returns (uint256 gen_);
 
-    function tokenURI(uint256 _id) external returns (string memory);
+    function tokenURI(uint256 _id) external view returns (string memory);
 }

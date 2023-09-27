@@ -187,7 +187,7 @@ library CheckpointTimestamps {
     ) private pure returns (Checkpoint storage result) {
         assembly {
             mstore(0, self.slot)
-            result.slot := add(keccak256(0, 0x40), pos)
+            result.slot := add(keccak256(0, 0x20), pos)
         }
     }
 }
