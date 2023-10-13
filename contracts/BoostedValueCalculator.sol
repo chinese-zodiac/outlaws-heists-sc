@@ -30,7 +30,7 @@ contract BoostedValueCalculator is AccessControlEnumerable {
             basePower += IBooster(additiveBoosters[i]).getBoost(at, gangId);
         }
         address[] memory multiplicativeBoosters = getAllBoostersMul(keyHash);
-        uint256 multiplierBasisPoints = 10000;
+        uint256 multiplierBasisPoints;
         for (uint i; i < multiplicativeBoosters.length; i++) {
             multiplierBasisPoints += IBooster(multiplicativeBoosters[i])
                 .getBoost(at, gangId);

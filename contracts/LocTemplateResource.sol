@@ -33,6 +33,17 @@ contract LocTemplateResource is LocationBase {
         uint256 id;
     }
 
+    bytes32 public constant BOOSTER_GANG_PULL =
+        keccak256(abi.encodePacked("BOOSTER_GANG_PULL"));
+    bytes32 public constant BOOSTER_GANG_PROD_DAILY =
+        keccak256(abi.encodePacked("BOOSTER_GANG_PROD_DAILY"));
+    bytes32 public constant BOOSTER_GANG_POWER =
+        keccak256(abi.encodePacked("BOOSTER_GANG_POWER"));
+    bytes32 public constant BOOSTER_GANG_ATK_TIMER =
+        keccak256(abi.encodePacked("BOOSTER_GANG_ATK_TIMER"));
+    bytes32 public constant BOOSTER_GANG_TRAVEL_TIMER =
+        keccak256(abi.encodePacked("BOOSTER_GANG_TRAVEL_TIMER"));
+
     EnumerableSet.UintSet shopItemKeys;
     Counters.Counter shopItemNextUid;
     mapping(uint256 => ShopItem) public shopItems;
@@ -131,14 +142,12 @@ contract LocTemplateResource is LocationBase {
     function claimPendingResources(
         uint256 gangId
     ) public onlyGangOwner(gangId) {
-        uint256 claim = boostedValueCalculator.getBoostedValue(
-            this,
-            keccak256(abi.encodePacked("GANG_RESOURCE_CLAIM")),
-            gangId
-        );
+        uint256 initialResourceBal = resourceToken.balanceOf(address(this));
         resourceStakingPool.claimFor(bytes32(gangId));
-        resourceToken.approve(address(entityStoreERC20), claim);
-        entityStoreERC20.deposit(gang, gangId, resourceToken, claim);
+        uint256 deltabal = resourceToken.balanceOf(address(this)) -
+            initialResourceBal;
+        resourceToken.approve(address(entityStoreERC20), deltabal);
+        entityStoreERC20.deposit(gang, gangId, resourceToken, deltabal);
     }
 
     function startAttack(
@@ -165,7 +174,7 @@ contract LocTemplateResource is LocationBase {
             block.timestamp +
             boostedValueCalculator.getBoostedValue(
                 this,
-                keccak256(abi.encodePacked("GANG_ATK_TIMER")),
+                BOOSTER_GANG_ATK_TIMER,
                 attackerGangId
             );
         gangAttackTarget[attackerGangId] = defenderGangId;
@@ -189,6 +198,7 @@ contract LocTemplateResource is LocationBase {
             uint256 attackerPower = gangPower[attackerGangId];
             uint256 defenderPower = gangPower[defenderGangId];
 
+            //Destroy the bandit cost from attacker
             entityStoreERC20.withdraw(
                 gang,
                 attackerGangId,
@@ -200,6 +210,7 @@ contract LocTemplateResource is LocationBase {
                         bandit
                     )) / 10000
             );
+            bandit.burn(bandit.balanceOf(address(this)));
 
             if (
                 roller
@@ -271,7 +282,7 @@ contract LocTemplateResource is LocationBase {
                 block.timestamp +
                     boostedValueCalculator.getBoostedValue(
                         this,
-                        keccak256(abi.encodePacked("GANG_TRAVEL_TIMER")),
+                        BOOSTER_GANG_TRAVEL_TIMER,
                         gangId
                     )
             )
@@ -297,7 +308,7 @@ contract LocTemplateResource is LocationBase {
         if (_entity == gang) {
             gangPower[_entityId] = boostedValueCalculator.getBoostedValue(
                 this,
-                keccak256(abi.encodePacked("GANG_POWER")),
+                BOOSTER_GANG_POWER,
                 _entityId
             );
             _startGangProduction(_entityId);
@@ -456,10 +467,12 @@ contract LocTemplateResource is LocationBase {
         if (isDestination) {
             for (uint i; i < _destinations.length; i++) {
                 randomDestinations.add(_destinations[i]);
+                validDestinations.add(_destinations[i]);
             }
         } else {
             for (uint i; i < _destinations.length; i++) {
                 randomDestinations.remove(_destinations[i]);
+                validDestinations.remove(_destinations[i]);
             }
         }
     }
@@ -471,10 +484,12 @@ contract LocTemplateResource is LocationBase {
         if (isDestination) {
             for (uint i; i < _destinations.length; i++) {
                 fixedDestinations.add(_destinations[i]);
+                validDestinations.add(_destinations[i]);
             }
         } else {
             for (uint i; i < _destinations.length; i++) {
                 fixedDestinations.remove(_destinations[i]);
+                validDestinations.remove(_destinations[i]);
             }
         }
     }
@@ -486,6 +501,10 @@ contract LocTemplateResource is LocationBase {
     function setResourceToken(TokenBase to) external onlyRole(MANAGER_ROLE) {
         resourceToken = to;
         resourceStakingPool.setRewardToken(to);
+    }
+
+    function setRoller(Roller to) external onlyRole(MANAGER_ROLE) {
+        roller = to;
     }
 
     function setAttackCooldown(uint256 to) external onlyRole(MANAGER_ROLE) {
@@ -507,13 +526,15 @@ contract LocTemplateResource is LocationBase {
     function addItemToShop(
         TokenBase item,
         TokenBase currency,
-        uint256 pricePerItemWad
+        uint256 pricePerItemWad,
+        uint256 increasePerItemSold
     ) external onlyRole(MANAGER_ROLE) {
         uint256 id = shopItemNextUid.current();
         shopItemKeys.add(id);
         shopItems[id].item = item;
         shopItems[id].currency = currency;
         shopItems[id].pricePerItemWad = pricePerItemWad;
+        shopItems[id].increasePerItemSold = increasePerItemSold;
         shopItems[id].id = id;
         shopItemNextUid.increment();
     }
@@ -563,12 +584,12 @@ contract LocTemplateResource is LocationBase {
     function _startGangProduction(uint256 gangId) internal {
         uint256 pull = boostedValueCalculator.getBoostedValue(
             this,
-            keccak256(abi.encodePacked("GANG_PULL")),
+            BOOSTER_GANG_PULL,
             gangId
         );
         gangProdDaily[gangId] = boostedValueCalculator.getBoostedValue(
             this,
-            keccak256(abi.encodePacked("GANG_PROD_DAILY")),
+            BOOSTER_GANG_PROD_DAILY,
             gangId
         );
         currentProdDaily += gangProdDaily[gangId];
