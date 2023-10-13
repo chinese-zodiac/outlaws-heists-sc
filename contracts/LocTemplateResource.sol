@@ -64,7 +64,6 @@ contract LocTemplateResource is LocationBase {
     uint256 public attackCostBps = 100;
     uint256 public victoryTransferBps = 10000;
 
-    ILocation public town;
     RngHistory public rngHistory;
     BoostedValueCalculator public boostedValueCalculator;
     ResourceStakingPool public resourceStakingPool;
@@ -76,12 +75,12 @@ contract LocTemplateResource is LocationBase {
     mapping(uint256 => MovementPreparation) gangMovementPreparations;
 
     EnumerableSet.AddressSet randomDestinations;
+    EnumerableSet.AddressSet fixedDestinations;
 
     constructor(
         ILocationController _locationController,
         EntityStoreERC20 _entityStoreERC20,
         IEntity _gang,
-        ILocation _town,
         ERC20Burnable _bandit,
         RngHistory _rngHistory,
         BoostedValueCalculator _boostedValueCalculator,
@@ -96,7 +95,6 @@ contract LocTemplateResource is LocationBase {
         boostedValueCalculator = _boostedValueCalculator;
         resourceToken = _resourceToken;
         gang = _gang;
-        town = _town;
         bandit = _bandit;
         roller = _roller;
 
@@ -250,33 +248,24 @@ contract LocTemplateResource is LocationBase {
         delete gangAttackTarget[attackerGangId];
     }
 
-    function prepareToMoveGangToTown(
-        uint256 gangId
+    function prepareToMoveGangToFixedDestination(
+        uint256 gangId,
+        ILocation destination
     ) external onlyLocalEntity(gang, gangId) onlyGangOwner(gangId) {
-        //since move is to a random resource location, the destination should be kept blank.
-        gangMovementPreparations[gangId].readyTimer.setDeadline(
-            uint64(
-                block.timestamp +
-                    boostedValueCalculator.getBoostedValue(
-                        this,
-                        keccak256(abi.encodePacked("GANG_TRAVEL_TIMER")),
-                        gangId
-                    )
-            )
-        );
-
-        if (gangLastAttack[gangId] != 0) {
-            //resolve pending attack
-            resolveAttack(gangId);
-        }
-
-        _haltGangProduction(gangId);
+        require(fixedDestinations.contains(address(destination)));
+        gangMovementPreparations[gangId].destination = destination;
+        _prepareMove(gangId);
     }
 
     function prepareToMoveGangToRandomLocation(
         uint256 gangId
     ) external onlyLocalEntity(gang, gangId) onlyGangOwner(gangId) {
         //since move is to a random resource location, the destination should be kept blank.
+        gangMovementPreparations[gangId].destination = ILocation(address(0x0));
+        _prepareMove(gangId);
+    }
+
+    function _prepareMove(uint256 gangId) internal {
         gangMovementPreparations[gangId].readyTimer.setDeadline(
             uint64(
                 block.timestamp +
@@ -423,6 +412,23 @@ contract LocTemplateResource is LocationBase {
     }
 
     //High gas usage, view only
+    function viewOnly_getAllFixedDestinations()
+        external
+        view
+        returns (address[] memory destinations_)
+    {
+        destinations_ = fixedDestinations.values();
+    }
+
+    function getFixedDestinationsCount() public view returns (uint256) {
+        return fixedDestinations.length();
+    }
+
+    function getFixedDestinationAt(uint256 _i) public view returns (address) {
+        return fixedDestinations.at(_i);
+    }
+
+    //High gas usage, view only
     function viewOnly_getAllShopItems()
         external
         view
@@ -458,12 +464,23 @@ contract LocTemplateResource is LocationBase {
         }
     }
 
-    function setRngHistory(RngHistory to) external onlyRole(MANAGER_ROLE) {
-        rngHistory = to;
+    function setFixedDestinations(
+        address[] calldata _destinations,
+        bool isDestination
+    ) public onlyRole(VALID_ENTITY_SETTER) {
+        if (isDestination) {
+            for (uint i; i < _destinations.length; i++) {
+                fixedDestinations.add(_destinations[i]);
+            }
+        } else {
+            for (uint i; i < _destinations.length; i++) {
+                fixedDestinations.remove(_destinations[i]);
+            }
+        }
     }
 
-    function setTown(ILocation to) external onlyRole(MANAGER_ROLE) {
-        town = to;
+    function setRngHistory(RngHistory to) external onlyRole(MANAGER_ROLE) {
+        rngHistory = to;
     }
 
     function setResourceToken(TokenBase to) external onlyRole(MANAGER_ROLE) {
