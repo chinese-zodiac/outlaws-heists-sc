@@ -30,7 +30,6 @@ contract LocTemplateResource is LocationBase {
         uint256 pricePerItemWad;
         uint256 increasePerItemSold;
         uint256 totalSold;
-        uint256 id;
     }
 
     bytes32 public constant BOOSTER_GANG_PULL =
@@ -108,6 +107,8 @@ contract LocTemplateResource is LocationBase {
         gang = _gang;
         bandit = _bandit;
         roller = _roller;
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(MANAGER_ROLE, msg.sender);
 
         resourceStakingPool = new ResourceStakingPool(
             _resourceToken,
@@ -451,7 +452,7 @@ contract LocTemplateResource is LocationBase {
     }
 
     function getShopItemsCount() public view returns (uint256) {
-        return randomDestinations.length();
+        return shopItemKeys.length();
     }
 
     function getShopItemAt(
@@ -535,32 +536,32 @@ contract LocTemplateResource is LocationBase {
         shopItems[id].currency = currency;
         shopItems[id].pricePerItemWad = pricePerItemWad;
         shopItems[id].increasePerItemSold = increasePerItemSold;
-        shopItems[id].id = id;
         shopItemNextUid.increment();
     }
 
     function setItemInShop(
-        uint256 id,
+        uint256 index,
         TokenBase item,
         TokenBase currency,
         uint256 pricePerItemWad,
         uint256 increasePerItemSold
     ) external onlyRole(MANAGER_ROLE) {
-        require(shopItemKeys.contains(id), "id not in shop");
+        require(shopItemKeys.length() > index, "index not in shop");
+        uint256 id = shopItemKeys.at(index);
         shopItems[id].item = item;
         shopItems[id].currency = currency;
         shopItems[id].pricePerItemWad = pricePerItemWad;
         shopItems[id].increasePerItemSold = increasePerItemSold;
     }
 
-    function deleteItemFromShop(uint256 id) external onlyRole(MANAGER_ROLE) {
-        require(shopItemKeys.contains(id), "id not in shop");
+    function deleteItemFromShop(uint256 index) external onlyRole(MANAGER_ROLE) {
+        require(shopItemKeys.length() > index, "index not in shop");
+        uint256 id = shopItemKeys.at(index);
         delete shopItems[id].item;
         delete shopItems[id].currency;
         delete shopItems[id].pricePerItemWad;
         delete shopItems[id].increasePerItemSold;
         delete shopItems[id].totalSold;
-        delete shopItems[id].id;
         delete shopItems[id];
         shopItemKeys.remove(id);
     }
