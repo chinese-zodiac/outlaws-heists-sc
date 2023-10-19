@@ -38,10 +38,6 @@ contract LocTemplateResource is LocationBase {
         keccak256(abi.encodePacked("BOOSTER_GANG_PROD_DAILY"));
     bytes32 public constant BOOSTER_GANG_POWER =
         keccak256(abi.encodePacked("BOOSTER_GANG_POWER"));
-    bytes32 public constant BOOSTER_GANG_ATK_TIMER =
-        keccak256(abi.encodePacked("BOOSTER_GANG_ATK_TIMER"));
-    bytes32 public constant BOOSTER_GANG_TRAVEL_TIMER =
-        keccak256(abi.encodePacked("BOOSTER_GANG_TRAVEL_TIMER"));
 
     EnumerableSet.UintSet shopItemKeys;
     Counters.Counter shopItemNextUid;
@@ -109,6 +105,7 @@ contract LocTemplateResource is LocationBase {
         roller = _roller;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MANAGER_ROLE, msg.sender);
+        _grantRole(VALID_ENTITY_SETTER, msg.sender);
 
         resourceStakingPool = new ResourceStakingPool(
             _resourceToken,
@@ -122,14 +119,46 @@ contract LocTemplateResource is LocationBase {
         _;
     }
 
+    function depositERC20(
+        uint256 gangId,
+        IERC20 token,
+        uint256 wad
+    ) external onlyGangOwner(gangId) {
+        require(token != bandit, "Cannot deposit bandits");
+        token.safeTransferFrom(msg.sender, address(this), wad);
+        token.approve(address(entityStoreERC20), wad);
+        entityStoreERC20.deposit(
+            gang,
+            gangId,
+            token,
+            token.balanceOf(address(this))
+        );
+        _haltGangProduction(gangId);
+        _startGangProduction(gangId);
+    }
+
+    function withdrawERC20(
+        uint256 gangId,
+        IERC20 token,
+        uint256 wad
+    ) external onlyGangOwner(gangId) {
+        require(token != bandit, "Cannot withdraw bandits");
+        entityStoreERC20.withdraw(gang, gangId, token, wad);
+        token.safeTransfer(msg.sender, token.balanceOf(address(this)));
+        _haltGangProduction(gangId);
+        _startGangProduction(gangId);
+    }
+
     function buyShopItem(
         uint256 gangId,
         uint256 shopItemId,
         uint256 quantity
     ) external onlyLocalEntity(gang, gangId) {
         ShopItem memory item = shopItems[shopItemId];
-        item.currency.burnFrom(
-            msg.sender,
+        entityStoreERC20.burn(
+            gang,
+            gangId,
+            item.currency,
             (quantity *
                 (item.pricePerItemWad +
                     item.totalSold *
@@ -137,6 +166,7 @@ contract LocTemplateResource is LocationBase {
         );
         item.item.mint(address(this), quantity);
         item.totalSold += quantity;
+        item.item.approve(address(entityStoreERC20), quantity);
         entityStoreERC20.deposit(gang, gangId, item.item, quantity);
     }
 
@@ -171,13 +201,7 @@ contract LocTemplateResource is LocationBase {
         );
         rngHistory.requestRandomWord{value: msg.value}();
         gangLastAttack[attackerGangId] = block.timestamp;
-        gangAttackCooldown[attackerGangId] =
-            block.timestamp +
-            boostedValueCalculator.getBoostedValue(
-                this,
-                BOOSTER_GANG_ATK_TIMER,
-                attackerGangId
-            );
+        gangAttackCooldown[attackerGangId] = block.timestamp + attackCooldown;
         gangAttackTarget[attackerGangId] = defenderGangId;
     }
 
@@ -200,7 +224,7 @@ contract LocTemplateResource is LocationBase {
             uint256 defenderPower = gangPower[defenderGangId];
 
             //Destroy the bandit cost from attacker
-            entityStoreERC20.withdraw(
+            entityStoreERC20.burn(
                 gang,
                 attackerGangId,
                 bandit,
@@ -211,7 +235,6 @@ contract LocTemplateResource is LocationBase {
                         bandit
                     )) / 10000
             );
-            bandit.burn(bandit.balanceOf(address(this)));
 
             if (
                 roller
@@ -279,14 +302,7 @@ contract LocTemplateResource is LocationBase {
 
     function _prepareMove(uint256 gangId) internal {
         gangMovementPreparations[gangId].readyTimer.setDeadline(
-            uint64(
-                block.timestamp +
-                    boostedValueCalculator.getBoostedValue(
-                        this,
-                        BOOSTER_GANG_TRAVEL_TIMER,
-                        gangId
-                    )
-            )
+            uint64(block.timestamp + travelTime)
         );
 
         if (gangLastAttack[gangId] != 0) {
@@ -310,6 +326,7 @@ contract LocTemplateResource is LocationBase {
             gangPower[_entityId] = boostedValueCalculator.getBoostedValue(
                 this,
                 BOOSTER_GANG_POWER,
+                gang,
                 _entityId
             );
             _startGangProduction(_entityId);
@@ -344,15 +361,15 @@ contract LocTemplateResource is LocationBase {
         }
     }
 
-    function pendingResources(uint256 gangId) public view returns (uint256) {
+    function pendingResources(uint256 gangId) external view returns (uint256) {
         return resourceStakingPool.pendingReward(bytes32(gangId));
     }
 
-    function gangPull(uint256 gangId) public view returns (uint256) {
+    function gangPull(uint256 gangId) external view returns (uint256) {
         return resourceStakingPool.getShares(bytes32(gangId));
     }
 
-    function totalPull() public view returns (uint256) {
+    function totalPull() external view returns (uint256) {
         return resourceStakingPool.totalShares();
     }
 
@@ -464,16 +481,18 @@ contract LocTemplateResource is LocationBase {
     function setRandomDestinations(
         address[] calldata _destinations,
         bool isDestination
-    ) public onlyRole(VALID_ENTITY_SETTER) {
+    ) public onlyRole(MANAGER_ROLE) {
         if (isDestination) {
             for (uint i; i < _destinations.length; i++) {
                 randomDestinations.add(_destinations[i]);
                 validDestinations.add(_destinations[i]);
+                validSources.add(_destinations[i]);
             }
         } else {
             for (uint i; i < _destinations.length; i++) {
                 randomDestinations.remove(_destinations[i]);
                 validDestinations.remove(_destinations[i]);
+                validSources.remove(_destinations[i]);
             }
         }
     }
@@ -481,22 +500,36 @@ contract LocTemplateResource is LocationBase {
     function setFixedDestinations(
         address[] calldata _destinations,
         bool isDestination
-    ) public onlyRole(VALID_ENTITY_SETTER) {
+    ) public onlyRole(MANAGER_ROLE) {
         if (isDestination) {
             for (uint i; i < _destinations.length; i++) {
                 fixedDestinations.add(_destinations[i]);
                 validDestinations.add(_destinations[i]);
+                validSources.add(_destinations[i]);
             }
         } else {
             for (uint i; i < _destinations.length; i++) {
                 fixedDestinations.remove(_destinations[i]);
                 validDestinations.remove(_destinations[i]);
+                validSources.remove(_destinations[i]);
             }
         }
     }
 
     function setRngHistory(RngHistory to) external onlyRole(MANAGER_ROLE) {
         rngHistory = to;
+    }
+
+    function setBoostedValueCalculator(
+        BoostedValueCalculator to
+    ) external onlyRole(MANAGER_ROLE) {
+        boostedValueCalculator = to;
+    }
+
+    function setResourceStakingPool(
+        ResourceStakingPool to
+    ) external onlyRole(MANAGER_ROLE) {
+        resourceStakingPool = to;
     }
 
     function setResourceToken(TokenBase to) external onlyRole(MANAGER_ROLE) {
@@ -586,11 +619,13 @@ contract LocTemplateResource is LocationBase {
         uint256 pull = boostedValueCalculator.getBoostedValue(
             this,
             BOOSTER_GANG_PULL,
+            gang,
             gangId
         );
         gangProdDaily[gangId] = boostedValueCalculator.getBoostedValue(
             this,
             BOOSTER_GANG_PROD_DAILY,
+            gang,
             gangId
         );
         currentProdDaily += gangProdDaily[gangId];

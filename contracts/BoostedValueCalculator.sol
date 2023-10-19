@@ -14,6 +14,11 @@ contract BoostedValueCalculator is AccessControlEnumerable {
     mapping(bytes32 => EnumerableSet.AddressSet) boostersMul;
     mapping(bytes32 => EnumerableSet.AddressSet) boostersAdd;
 
+    constructor() {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(BOOSTER_MANAGER, msg.sender);
+    }
+
     modifier hasKeyHash(bytes32 keyHash) {
         require(keyHashes.contains(keyHash), "keyHash does not exist");
         _;
@@ -22,18 +27,23 @@ contract BoostedValueCalculator is AccessControlEnumerable {
     function getBoostedValue(
         ILocation at,
         bytes32 keyHash,
-        uint256 gangId
+        IEntity entity,
+        uint256 entityId
     ) external view hasKeyHash(keyHash) returns (uint256) {
         address[] memory additiveBoosters = getAllBoostersAdd(keyHash);
         uint256 basePower;
         for (uint i; i < additiveBoosters.length; i++) {
-            basePower += IBooster(additiveBoosters[i]).getBoost(at, gangId);
+            basePower += IBooster(additiveBoosters[i]).getBoost(
+                at,
+                entity,
+                entityId
+            );
         }
         address[] memory multiplicativeBoosters = getAllBoostersMul(keyHash);
         uint256 multiplierBasisPoints;
         for (uint i; i < multiplicativeBoosters.length; i++) {
             multiplierBasisPoints += IBooster(multiplicativeBoosters[i])
-                .getBoost(at, gangId);
+                .getBoost(at, entity, entityId);
         }
         return (basePower * multiplierBasisPoints) / 10000;
     }
@@ -65,25 +75,22 @@ contract BoostedValueCalculator is AccessControlEnumerable {
         if (isValid) {
             for (uint i; i < _boosters.length; i++) {
                 boostersMul[keyHash].add(address(_boosters[i]));
-                require(keyHashes.add(keyHash), "Key already exists");
             }
         } else {
             for (uint i; i < _boosters.length; i++) {
                 boostersMul[keyHash].remove(address(_boosters[i]));
-                require(keyHashes.remove(keyHash), "Key does not exist exists");
             }
+        }
+        if (boostersMul[keyHash].length() + boostersAdd[keyHash].length() > 0) {
+            keyHashes.add(keyHash);
+        } else {
+            keyHashes.remove(keyHash);
         }
     }
 
     function getAllBoostersAdd(
         bytes32 keyHash
-    )
-        public
-        view
-        hasKeyHash(keyHash)
-        hasKeyHash(keyHash)
-        returns (address[] memory boosters)
-    {
+    ) public view hasKeyHash(keyHash) returns (address[] memory boosters) {
         boosters = boostersAdd[keyHash].values();
     }
 
@@ -113,6 +120,11 @@ contract BoostedValueCalculator is AccessControlEnumerable {
             for (uint i; i < _boosters.length; i++) {
                 boostersAdd[keyHash].remove(address(_boosters[i]));
             }
+        }
+        if (boostersMul[keyHash].length() + boostersAdd[keyHash].length() > 0) {
+            keyHashes.add(keyHash);
+        } else {
+            keyHashes.remove(keyHash);
         }
     }
 

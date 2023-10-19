@@ -3,10 +3,12 @@
 pragma solidity >=0.8.19;
 
 import "./ILocation.sol";
+import "./IEntity.sol";
 
 interface IBooster {
     function getBoost(
         ILocation location,
-        uint256 gangId
+        IEntity entity,
+        uint256 entityId
     ) external view returns (uint256 boost);
 }

@@ -7,8 +7,7 @@ import "./interfaces/ILocation.sol";
 import "./EntityStoreERC721.sol";
 import "./czodiac/IOutlawsNft.sol";
 
-contract BoosterGangPowerMulOutlaws is IBooster {
-    IERC721 public immutable gang;
+contract BoosterOutlawSet is IBooster {
     IOutlawsNft public immutable outlaws;
     EntityStoreERC721 public immutable entityStoreERC721;
 
@@ -22,18 +21,14 @@ contract BoosterGangPowerMulOutlaws is IBooster {
 
     uint256[] public BOOSTS = [2500, 5000, 10000, 20000, 40000];
 
-    constructor(
-        IOutlawsNft _outlaws,
-        IERC721 _gang,
-        EntityStoreERC721 _entityStoreERC721
-    ) {
+    constructor(IOutlawsNft _outlaws, EntityStoreERC721 _entityStoreERC721) {
         outlaws = _outlaws;
-        gang = _gang;
         entityStoreERC721 = _entityStoreERC721;
     }
 
     function getBoost(
         ILocation,
+        IEntity gang,
         uint256 gangId
     ) external view returns (uint256 boost) {
         //there will never be more than 5 outlaws per gang, so using getAllStoredERC721 is OK

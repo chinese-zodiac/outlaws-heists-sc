@@ -23,7 +23,7 @@ contract ResourceStakingPool is Ownable {
     uint256 public rewardPerSecond;
 
     // The precision factor
-    uint256 public PRECISION_FACTOR;
+    uint256 public immutable PRECISION_FACTOR;
 
     // The reward token
     TokenBase public rewardToken;
@@ -50,6 +50,12 @@ contract ResourceStakingPool is Ownable {
 
         // Transfer ownership to the admin address who becomes owner of the contract
         transferOwnership(_admin);
+
+        PRECISION_FACTOR = uint256(
+            10 **
+                (uint256(30) -
+                    (IERC20Metadata(address(_rewardToken)).decimals()))
+        );
     }
 
     function depositFor(
