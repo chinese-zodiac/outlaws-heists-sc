@@ -173,6 +173,9 @@ contract LocTemplateResource is LocationBase {
     function claimPendingResources(
         uint256 gangId
     ) public onlyGangOwner(gangId) {
+        if (resourceStakingPool.pendingReward(bytes32(gangId)) == 0) {
+            return;
+        }
         uint256 initialResourceBal = resourceToken.balanceOf(address(this));
         resourceStakingPool.claimFor(bytes32(gangId));
         uint256 deltabal = resourceToken.balanceOf(address(this)) -
@@ -365,12 +368,19 @@ contract LocTemplateResource is LocationBase {
         return resourceStakingPool.pendingReward(bytes32(gangId));
     }
 
-    function gangPull(uint256 gangId) external view returns (uint256) {
+    function gangPull(uint256 gangId) public view returns (uint256) {
         return resourceStakingPool.getShares(bytes32(gangId));
     }
 
-    function totalPull() external view returns (uint256) {
+    function totalPull() public view returns (uint256) {
         return resourceStakingPool.totalShares();
+    }
+
+    function gangResourcesPerDay(
+        uint256 gangId
+    ) external view returns (uint256) {
+        if (totalPull() == 0) return 0;
+        return (gangPull(gangId) * currentProdDaily) / totalPull();
     }
 
     function gangDestination(uint256 gangId) public view returns (ILocation) {
@@ -404,7 +414,9 @@ contract LocTemplateResource is LocationBase {
     }
 
     function isGangPreparingToMove(uint256 gangId) public view returns (bool) {
-        return gangMovementPreparations[gangId].readyTimer.isPending();
+        return
+            gangMovementPreparations[gangId].readyTimer.isPending() ||
+            isGangReadyToMove(gangId);
     }
 
     function isGangReadyToMove(uint256 gangId) public view returns (bool) {

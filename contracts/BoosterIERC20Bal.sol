@@ -29,6 +29,6 @@ contract BoosterIERC20Bal is IBooster {
     ) external view returns (uint256 boost) {
         return
             (entityStoreERC20.getStoredER20WadFor(entity, entityId, token) *
-                bps) / 10000 ether;
+                bps) / 10000;
     }
 }

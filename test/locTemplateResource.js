@@ -9,9 +9,10 @@ const { time, expectRevert } = require("@openzeppelin/test-helpers");
 const { toNum, toBN } = require("./utils/bignumberConverter");
 const loadJsonFile = require("load-json-file");
 const { parse } = require('typechain');
+const ether = require('@openzeppelin/test-helpers/src/ether');
 
 const { LocationController, EntityStoreERC20, EntityStoreERC721,
-    Bandits, Outlaws, Gangs, TownSquare, CZUSD, RngHistory, SilverStore, USTSD,
+    Bandits, Outlaws, Gangs, TownSquare, CZUSD, RngHistory, SilverStore, USTSD, UstsdAdmin,
     pancakeswapRouter, pancakeswapFactory } = loadJsonFile.sync("./deployconfig.json");
 
 
@@ -21,11 +22,11 @@ const { parseEther, formatEther } = ethers.utils;
 
 describe("LocTemplateResource", function () {
     let locationController, rngHistory, boostedValueCalculator, roller;
-    let gangs, bandits, outlaws, czusd;
+    let gangs, bandits, outlaws, czusd, ustsd, silverStore;
     let owner, player1, player2, player3;
     let entityStoreErc20, entityStoreErc721;
     let town;
-    let czDeployer, czusdMinter;
+    let czDeployer, czusdMinter, ustsdAdmin;
     let outlawIds = [];
     let resourceLocations = [];
     let resourceTokens = [];
@@ -46,6 +47,12 @@ describe("LocTemplateResource", function () {
             params: [czDeployerAddr],
         })
         czDeployer = await ethers.getSigner(czDeployerAddr);
+        const ustsdAdminAddr = "0xfC74a37FFF6EA97fF555e5ff996193e12a464431"
+        await hre.network.provider.request({
+            method: "hardhat_impersonateAccount",
+            params: [ustsdAdminAddr],
+        })
+        ustsdAdmin = await ethers.getSigner(ustsdAdminAddr);
 
         await owner.sendTransaction({
             to: czusdMinter.address,
@@ -57,9 +64,14 @@ describe("LocTemplateResource", function () {
         outlaws = await ethers.getContractAt("IOutlawsNft", Outlaws);
         gangs = await ethers.getContractAt("Gangs", Gangs);
         bandits = await ethers.getContractAt("TokenBase", Bandits);
+        ustsd = await ethers.getContractAt("JsonNftTemplate", USTSD);
         entityStoreErc20 = await ethers.getContractAt("EntityStoreERC20", EntityStoreERC20);
         entityStoreErc721 = await ethers.getContractAt("EntityStoreERC721", EntityStoreERC721);
         town = await ethers.getContractAt("LocTownSquare", TownSquare);
+        silverStore = await ethers.getContractAt("LocSilverStore", SilverStore);
+
+        await bandits.connect(czDeployer).grantRole(ethers.utils.id("MINTER_ROLE"), owner.address);
+        await ustsd.connect(ustsdAdmin).grantRole(ethers.utils.id("MANAGER_ROLE"), owner.address);
 
         const BoostedValueCalculator = await ethers.getContractFactory("BoostedValueCalculator");
         boostedValueCalculator = await BoostedValueCalculator.deploy();
@@ -122,6 +134,10 @@ describe("LocTemplateResource", function () {
             roller.address,
             parseEther("2500")
         );
+        await resourceTokens[0].grantRole(ethers.utils.id("MINTER_ROLE"), await resourceLocations[0].resourceStakingPool());
+        await resourceTokens[1].grantRole(ethers.utils.id("MINTER_ROLE"), await resourceLocations[1].resourceStakingPool());
+        await resourceTokens[2].grantRole(ethers.utils.id("MINTER_ROLE"), await resourceLocations[2].resourceStakingPool());
+
         await outlaws.connect(czDeployer).grantRole(ethers.utils.id("MANAGER_ROLE"), czDeployer.address);
 
         await boostedValueCalculator.setBoostersAdd(
@@ -158,6 +174,7 @@ describe("LocTemplateResource", function () {
         await resourceLocations[2].setValidEntities([gangs.address], true);
 
         await town.connect(czDeployer).setValidRoute([resourceLocations[0].address], true);
+        await silverStore.connect(czDeployer).setValidRoute([resourceLocations[0].address], true);
 
         const outlawsSupply = toNum(await outlaws.totalSupply());
 
@@ -293,9 +310,9 @@ describe("LocTemplateResource", function () {
         const index0Phase0 = await resourceLocations[0].getFixedDestinationAt(0);
         await resourceLocations[0].setFixedDestinations([TownSquare], false);
         const countPhase1 = await resourceLocations[0].getFixedDestinationsCount();
-        await resourceLocations[0].setFixedDestinations([TownSquare], true);
-        await resourceLocations[1].setFixedDestinations([TownSquare], true);
-        await resourceLocations[2].setFixedDestinations([TownSquare], true);
+        await resourceLocations[0].setFixedDestinations([TownSquare, SilverStore], true);
+        await resourceLocations[1].setFixedDestinations([TownSquare, SilverStore], true);
+        await resourceLocations[2].setFixedDestinations([TownSquare, SilverStore], true);
 
         expect(countPhase0).to.eq(1);
         expect(index0Phase0).to.eq(TownSquare);
@@ -309,9 +326,9 @@ describe("LocTemplateResource", function () {
         const index1Phase0 = await resourceLocations[0].getRandomDestinationAt(1);
         await resourceLocations[0].setRandomDestinations([resourceLocations[1].address, resourceLocations[2].address], false);
         const countPhase1 = await resourceLocations[0].getRandomDestinationsCount();
-        await resourceLocations[0].setFixedDestinations([resourceLocations[1].address, resourceLocations[2].address], true);
-        await resourceLocations[1].setFixedDestinations([resourceLocations[0].address, resourceLocations[2].address], true);
-        await resourceLocations[2].setFixedDestinations([resourceLocations[1].address, resourceLocations[0].address], true);
+        await resourceLocations[0].setRandomDestinations([resourceLocations[1].address, resourceLocations[2].address], true);
+        await resourceLocations[1].setRandomDestinations([resourceLocations[0].address, resourceLocations[2].address], true);
+        await resourceLocations[2].setRandomDestinations([resourceLocations[1].address, resourceLocations[0].address], true);
 
         expect(countPhase0).to.eq(2);
         expect(index0Phase0).to.eq(resourceLocations[1].address);
@@ -329,7 +346,6 @@ describe("LocTemplateResource", function () {
         const isGangReadyToMove = await resourceLocations[0].isGangReadyToMove(player1GangId);
         const isGangWorking = await resourceLocations[0].isGangWorking(player1GangId);
         const totalPull = await resourceLocations[0].totalPull();
-        console.log(pull)
         expect(pull).to.eq(0);
         expect(pendingResources).to.eq(0);
         expect(gangDestination).to.eq(ethers.constants.AddressZero);
@@ -337,5 +353,134 @@ describe("LocTemplateResource", function () {
         expect(isGangReadyToMove).to.be.false;
         expect(isGangWorking).to.be.true;
         expect(totalPull).to.eq(0);
+    });
+    it("Should allow move from loc0 to town only after travel time passed", async function () {
+        const player1GangId = await gangs.tokenOfOwnerByIndex(player1.address, 0);
+        await expect(locationController.connect(player1).move(gangs.address, player1GangId, town.address)).to.be.reverted;
+        await resourceLocations[0].connect(player1).prepareToMoveGangToFixedDestination(player1GangId, town.address);
+        const isGangPreparingToMoveP0 = await resourceLocations[0].isGangPreparingToMove(player1GangId);
+        const isGangReadyToMoveP0 = await resourceLocations[0].isGangReadyToMove(player1GangId);
+        const isGangWorkingP0 = await resourceLocations[0].isGangWorking(player1GangId);
+        await expect(locationController.connect(player1).move(gangs.address, player1GangId, town.address)).to.be.reverted;
+        await time.increase(time.duration.hours(4));
+        await time.advanceBlock();
+        const isGangPreparingToMoveP1 = await resourceLocations[0].isGangPreparingToMove(player1GangId);
+        const isGangReadyToMoveP1 = await resourceLocations[0].isGangReadyToMove(player1GangId);
+        const isGangWorkingP1 = await resourceLocations[0].isGangWorking(player1GangId);
+        await locationController.connect(player1).move(gangs.address, player1GangId, town.address);
+        const isGangPreparingToMoveP2 = await resourceLocations[0].isGangPreparingToMove(player1GangId);
+        const isGangReadyToMoveP2 = await resourceLocations[0].isGangReadyToMove(player1GangId);
+        const isGangWorkingP2 = await resourceLocations[0].isGangWorking(player1GangId);
+        expect(isGangPreparingToMoveP0).to.be.true;
+        expect(isGangReadyToMoveP0).to.be.false;
+        expect(isGangWorkingP0).to.be.false;
+        expect(isGangPreparingToMoveP1).to.be.true;
+        expect(isGangReadyToMoveP1).to.be.true;
+        expect(isGangWorkingP1).to.be.false;
+        expect(isGangPreparingToMoveP2).to.be.false;
+        expect(isGangReadyToMoveP2).to.be.false;
+        expect(isGangWorkingP2).to.be.false;
+    });
+    it("Should properly have the correct boosted val for l0, after adding bandits and ustsd", async function () {
+        const player1GangId = await gangs.tokenOfOwnerByIndex(player1.address, 0);
+        const player2GangId = await gangs.tokenOfOwnerByIndex(player2.address, 0);
+        const player3GangId = await gangs.tokenOfOwnerByIndex(player3.address, 0);
+        await bandits.mint(player1.address, parseEther("100"));
+        await bandits.mint(player2.address, parseEther("250"));
+        await bandits.mint(player3.address, parseEther("400"));
+        await bandits.connect(player1).approve(town.address, parseEther("100"));
+        await bandits.connect(player2).approve(town.address, parseEther("250"));
+        await bandits.connect(player3).approve(town.address, parseEther("400"));
+        await town.connect(player1).depositBandits(player1GangId, parseEther("100"));
+        await town.connect(player2).depositBandits(player2GangId, parseEther("250"));
+        await town.connect(player3).depositBandits(player3GangId, parseEther("400"));
+
+        await locationController.connect(player1).move(gangs.address, player1GangId, silverStore.address);
+        await locationController.connect(player2).move(gangs.address, player2GangId, silverStore.address);
+        await locationController.connect(player3).move(gangs.address, player3GangId, silverStore.address);
+
+        const ustsdTotalSupply = toNum(await ustsd.totalSupply());
+        await ustsd.add("", "");
+        await ustsd.add("", "");
+        await ustsd.add("", "");
+        await ustsd.add("", "");
+        await ustsd.add("", "");
+        await ustsd.add("", "");
+        await ustsd.add("", "");
+        await ustsd.transferFrom(owner.address, player1.address, ustsdTotalSupply);
+        await ustsd.transferFrom(owner.address, player2.address, ustsdTotalSupply + 1);
+        await ustsd.transferFrom(owner.address, player2.address, ustsdTotalSupply + 2);
+        await ustsd.transferFrom(owner.address, player3.address, ustsdTotalSupply + 3);
+        await ustsd.transferFrom(owner.address, player3.address, ustsdTotalSupply + 4);
+        await ustsd.transferFrom(owner.address, player3.address, ustsdTotalSupply + 5);
+        await ustsd.transferFrom(owner.address, player3.address, ustsdTotalSupply + 6);
+
+        await ustsd.connect(player1).setApprovalForAll(silverStore.address, true);
+        await ustsd.connect(player2).setApprovalForAll(silverStore.address, true);
+        await ustsd.connect(player3).setApprovalForAll(silverStore.address, true);
+
+        await silverStore.connect(player1).depositUstsd(player1GangId, [ustsdTotalSupply]);
+        await silverStore.connect(player2).depositUstsd(player2GangId, [ustsdTotalSupply + 1, ustsdTotalSupply + 2]);
+        await silverStore.connect(player3).depositUstsd(player3GangId, [ustsdTotalSupply + 3, ustsdTotalSupply + 4, ustsdTotalSupply + 5, ustsdTotalSupply + 6]);
+
+        const gangPullPlayer1 = await boostedValueCalculator.getBoostedValue(ethers.constants.AddressZero, ethers.utils.id("BOOSTER_GANG_PULL"), gangs.address, player1GangId);
+        const gangPullPlayer2 = await boostedValueCalculator.getBoostedValue(ethers.constants.AddressZero, ethers.utils.id("BOOSTER_GANG_PULL"), gangs.address, player2GangId);
+        const gangPullPlayer3 = await boostedValueCalculator.getBoostedValue(ethers.constants.AddressZero, ethers.utils.id("BOOSTER_GANG_PULL"), gangs.address, player3GangId);
+
+        const gangProdPlayer1 = await boostedValueCalculator.getBoostedValue(ethers.constants.AddressZero, ethers.utils.id("BOOSTER_GANG_PROD_DAILY"), gangs.address, player1GangId);
+        const gangProdPlayer2 = await boostedValueCalculator.getBoostedValue(ethers.constants.AddressZero, ethers.utils.id("BOOSTER_GANG_PROD_DAILY"), gangs.address, player2GangId);
+        const gangProdPlayer3 = await boostedValueCalculator.getBoostedValue(ethers.constants.AddressZero, ethers.utils.id("BOOSTER_GANG_PROD_DAILY"), gangs.address, player3GangId);
+
+        const gangPowerPlayer1 = await boostedValueCalculator.getBoostedValue(ethers.constants.AddressZero, ethers.utils.id("BOOSTER_GANG_POWER"), gangs.address, player1GangId);
+        const gangPowerPlayer2 = await boostedValueCalculator.getBoostedValue(ethers.constants.AddressZero, ethers.utils.id("BOOSTER_GANG_POWER"), gangs.address, player2GangId);
+        const gangPowerPlayer3 = await boostedValueCalculator.getBoostedValue(ethers.constants.AddressZero, ethers.utils.id("BOOSTER_GANG_POWER"), gangs.address, player3GangId);
+
+        expect(gangPullPlayer1).to.eq(gangPowerPlayer1);
+        expect(gangPullPlayer2).to.eq(gangPowerPlayer2);
+        expect(gangPullPlayer3).to.eq(gangPowerPlayer3);
+        expect(gangProdPlayer1).to.eq(0);
+        expect(gangProdPlayer2).to.eq(0);
+        expect(gangProdPlayer3).to.eq(0);
+        expect(gangPowerPlayer1).to.eq(parseEther("100").mul(10000 + 2500 + 1000).div(10000));
+        expect(gangPowerPlayer2).to.eq(parseEther("250").mul(10000 + 5000 + 2000).div(10000));
+        expect(gangPowerPlayer3).to.eq(parseEther("400").mul(10000 + 40000 + 4000).div(10000));
+    });
+    it("Should allow move from town to location 0 for all gangs", async function () {
+        const player1GangId = await gangs.tokenOfOwnerByIndex(player1.address, 0);
+        const player2GangId = await gangs.tokenOfOwnerByIndex(player2.address, 0);
+        const player3GangId = await gangs.tokenOfOwnerByIndex(player3.address, 0);
+        await locationController.connect(player1).move(gangs.address, player1GangId, resourceLocations[0].address);
+        await locationController.connect(player2).move(gangs.address, player2GangId, resourceLocations[0].address);
+        await locationController.connect(player3).move(gangs.address, player3GangId, resourceLocations[0].address);
+        const player1GangPull = await resourceLocations[0].gangPull(player1GangId);
+        const player2GangPull = await resourceLocations[0].gangPull(player2GangId);
+        const player3GangPull = await resourceLocations[0].gangPull(player3GangId);
+        const totalPull = await resourceLocations[0].totalPull();
+        const player1GangRpd = await resourceLocations[0].gangResourcesPerDay(player1GangId);
+        const player2GangRpd = await resourceLocations[0].gangResourcesPerDay(player2GangId);
+        const player3GangRpd = await resourceLocations[0].gangResourcesPerDay(player3GangId);
+        expect(player1GangPull).to.eq(parseEther("100").mul(10000 + 2500 + 1000).div(10000));
+        expect(player2GangPull).to.eq(parseEther("250").mul(10000 + 5000 + 2000).div(10000));
+        expect(player3GangPull).to.eq(parseEther("400").mul(10000 + 40000 + 4000).div(10000));
+        expect(totalPull).to.eq(player1GangPull.add(player2GangPull).add(player3GangPull));
+        expect(player1GangRpd).to.eq(player1GangPull.mul(parseEther('1')).div(totalPull));
+        expect(player2GangRpd).to.eq(player2GangPull.mul(parseEther('1')).div(totalPull));
+        expect(player3GangRpd).to.eq(player3GangPull.mul(parseEther('1')).div(totalPull));
+    });
+    it("Should claim after 1 day", async function () {
+        const player1GangId = await gangs.tokenOfOwnerByIndex(player1.address, 0);
+        const player1GangPull = await resourceLocations[0].gangPull(player1GangId);
+        const totalPull = await resourceLocations[0].totalPull();
+        const expectedDaily = player1GangPull.mul(parseEther('1')).div(totalPull);
+        const initialPending = await resourceLocations[0].pendingResources(player1GangId);
+        await time.increase(time.duration.hours(24));
+        const finalPending = await resourceLocations[0].pendingResources(player1GangId);
+        await resourceLocations[0].connect(player1).claimPendingResources(player1GangId);
+        const resourceBal = await entityStoreErc20.getStoredER20WadFor(gangs.address, player1GangId, resourceTokens[0].address);
+        const postClaimPending = await resourceLocations[0].pendingResources(player1GangId);
+
+        expect(postClaimPending).to.eq(0);
+        expect(resourceBal).to.be.closeTo(finalPending, parseEther("0.0001"));
+        expect(expectedDaily).to.be.closeTo(finalPending.sub(initialPending), parseEther("0.0001"));
     });
 });
