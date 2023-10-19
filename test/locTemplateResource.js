@@ -483,4 +483,47 @@ describe("LocTemplateResource", function () {
         expect(resourceBal).to.be.closeTo(finalPending, parseEther("0.0001"));
         expect(expectedDaily).to.be.closeTo(finalPending.sub(initialPending), parseEther("0.0001"));
     });
+    it("Should start attack", async function () {
+        const player1GangId = await gangs.tokenOfOwnerByIndex(player1.address, 0);
+        const player3GangId = await gangs.tokenOfOwnerByIndex(player3.address, 0);
+        await expect(resourceLocations[0].connect(player1).startAttack(player3GangId, player1GangId)).to.be.reverted;
+        resourceLocations[0].connect(player3).startAttack(player3GangId, player1GangId);
+        const now = await time.latest();
+        const lastAttack = await resourceLocations[0].gangLastAttack(player3GangId);
+        const gangAttackCooldown = await resourceLocations[0].gangAttackCooldown(player3GangId);
+        const gangAttackTarget = await resourceLocations[0].gangAttackTarget(player3GangId);
+        await expect(resourceLocations[0].connect(player3).startAttack(player3GangId, player1GangId)).to.be.reverted;
+
+        expect(lastAttack).to.eq(now.toNumber() + 1);
+        expect(gangAttackTarget).to.eq(player1GangId);
+        expect(gangAttackCooldown).to.eq(now.add(time.duration.hours(4)).toNumber() + 1);
+    });
+    it("Should resolve attack", async function () {
+        const player1GangId = await gangs.tokenOfOwnerByIndex(player1.address, 0);
+        const player2GangId = await gangs.tokenOfOwnerByIndex(player2.address, 0);
+        const player3GangId = await gangs.tokenOfOwnerByIndex(player3.address, 0);
+        await time.increase(time.duration.minutes(1));
+        await expect(resourceLocations[0].connect(player3).resolveAttack(player3GangId)).to.be.reverted;
+        await rngHistory.setRandomWord(100);
+        await resourceLocations[0].connect(player3).resolveAttack(player3GangId);
+        await expect(resourceLocations[0].connect(player3).startAttack(player3GangId, player1GangId)).to.be.reverted;
+        const gang1Bandits = await entityStoreErc20.getStoredER20WadFor(gangs.address, player1GangId, bandits.address);
+        const gang3Bandits = await entityStoreErc20.getStoredER20WadFor(gangs.address, player3GangId, bandits.address);
+        const gangLastAttack = await resourceLocations[0].gangLastAttack(player3GangId);
+        const gangAttackTarget = await resourceLocations[0].gangAttackTarget(player3GangId);
+        const expectedWinAmt = parseEther("100").mul(1000).div(10000);
+        const expectedBurnAmt = parseEther("400").mul(200).div(10000);
+        const expectedFinalGang1Bal = parseEther("100").sub(expectedWinAmt);
+        const expectedFinalGang3Bal = parseEther("400").sub(expectedBurnAmt).add(expectedWinAmt);
+        const player1GangPull = await resourceLocations[0].gangPull(player1GangId);
+        const player2GangPull = await resourceLocations[0].gangPull(player2GangId);
+        const player3GangPull = await resourceLocations[0].gangPull(player3GangId);
+        expect(gang1Bandits).to.eq(expectedFinalGang1Bal);
+        expect(gang3Bandits).to.eq(expectedFinalGang3Bal);
+        expect(gangLastAttack).to.eq(0);
+        expect(gangAttackTarget).to.eq(ethers.constants.AddressZero);
+        expect(player1GangPull).to.eq(expectedFinalGang1Bal.mul(10000 + 2500 + 1000).div(10000));
+        expect(player2GangPull).to.eq(parseEther("250").mul(10000 + 5000 + 2000).div(10000));
+        expect(player3GangPull).to.eq(expectedFinalGang3Bal.mul(10000 + 40000 + 4000).div(10000));
+    });
 });

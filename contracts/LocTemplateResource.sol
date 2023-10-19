@@ -67,8 +67,8 @@ contract LocTemplateResource is LocationBase {
     mapping(uint256 => uint256) public gangAttackCooldown;
     mapping(uint256 => uint256) public gangAttackTarget;
 
-    uint256 public attackCostBps = 100;
-    uint256 public victoryTransferBps = 10000;
+    uint256 public attackCostBps = 200;
+    uint256 public victoryTransferBps = 1000;
 
     RngHistory public rngHistory;
     BoostedValueCalculator public boostedValueCalculator;
@@ -172,7 +172,11 @@ contract LocTemplateResource is LocationBase {
 
     function claimPendingResources(
         uint256 gangId
-    ) public onlyGangOwner(gangId) {
+    ) external onlyGangOwner(gangId) {
+        _claimPendingResources(gangId);
+    }
+
+    function _claimPendingResources(uint256 gangId) internal {
         if (resourceStakingPool.pendingReward(bytes32(gangId)) == 0) {
             return;
         }
@@ -194,6 +198,7 @@ contract LocTemplateResource is LocationBase {
         onlyLocalEntity(gang, defenderGangId)
         onlyGangOwner(attackerGangId)
     {
+        require(attackerGangId != defenderGangId, "Cannot attack self");
         require(
             msg.value == rngHistory.requestFee(),
             "Must pay rngHistory.requestFee"
@@ -202,13 +207,16 @@ contract LocTemplateResource is LocationBase {
             gangAttackCooldown[attackerGangId] <= block.timestamp,
             "Attack on cooldown"
         );
+        require(isGangWorking(attackerGangId), "Attacker not working");
         rngHistory.requestRandomWord{value: msg.value}();
         gangLastAttack[attackerGangId] = block.timestamp;
         gangAttackCooldown[attackerGangId] = block.timestamp + attackCooldown;
         gangAttackTarget[attackerGangId] = defenderGangId;
     }
 
-    function resolveAttack(uint256 attackerGangId) public {
+    function resolveAttack(
+        uint256 attackerGangId
+    ) public onlyGangOwner(attackerGangId) {
         require(gangLastAttack[attackerGangId] != 0, "No attack queued");
         uint256 defenderGangId = gangAttackTarget[attackerGangId];
 
@@ -620,7 +628,7 @@ contract LocTemplateResource is LocationBase {
     }
 
     function _haltGangProduction(uint256 gangId) internal {
-        claimPendingResources(gangId);
+        _claimPendingResources(gangId);
         resourceStakingPool.setRewardPerSecond(currentProdDaily / 24 hours);
         resourceStakingPool.withdrawFor(bytes32(gangId));
         currentProdDaily -= gangProdDaily[gangId];
