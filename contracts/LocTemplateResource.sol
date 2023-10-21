@@ -11,6 +11,7 @@ import "./EntityStoreERC20.sol";
 import "./ResourceStakingPool.sol";
 import "./Roller.sol";
 import "@openzeppelin/contracts/utils/Timers.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/structs/BitMaps.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -79,6 +80,16 @@ contract LocTemplateResource is LocationBase {
         ILocation destination;
     }
     mapping(uint256 => MovementPreparation) gangMovementPreparations;
+
+    struct Attack {
+        uint256 attackerGangId;
+        uint256 defenderGangId;
+        uint256 cost;
+        uint256 winnings;
+        uint256 time;
+    }
+    mapping(uint256 => Attack) attackLog;
+    Counters.Counter attackLogNextUid;
 
     EnumerableSet.AddressSet randomDestinations;
     EnumerableSet.AddressSet fixedDestinations;
@@ -218,6 +229,7 @@ contract LocTemplateResource is LocationBase {
         uint256 attackerGangId
     ) public onlyGangOwner(attackerGangId) {
         require(gangLastAttack[attackerGangId] != 0, "No attack queued");
+
         uint256 defenderGangId = gangAttackTarget[attackerGangId];
 
         uint256 randWord = rngHistory.getAtOrAfterTimestamp(
@@ -231,22 +243,23 @@ contract LocTemplateResource is LocationBase {
         ) {
             //defender ran away, do nothing
         } else {
+            Attack storage attack = attackLog[attackLogNextUid.current()];
+            attackLogNextUid.increment();
+            attack.attackerGangId = attackerGangId;
+            attack.defenderGangId = defenderGangId;
+            attack.time = block.timestamp;
             uint256 attackerPower = gangPower[attackerGangId];
             uint256 defenderPower = gangPower[defenderGangId];
 
             //Destroy the bandit cost from attacker
-            entityStoreERC20.burn(
-                gang,
-                attackerGangId,
-                bandit,
-                (attackCostBps *
-                    entityStoreERC20.getStoredER20WadFor(
-                        gang,
-                        attackerGangId,
-                        bandit
-                    )) / 10000
-            );
-
+            uint256 attackCost = (attackCostBps *
+                entityStoreERC20.getStoredER20WadFor(
+                    gang,
+                    attackerGangId,
+                    bandit
+                )) / 10000;
+            entityStoreERC20.burn(gang, attackerGangId, bandit, attackCost);
+            attack.cost = attackCost;
             if (
                 roller
                     .getUniformRoll(
@@ -268,19 +281,21 @@ contract LocTemplateResource is LocationBase {
                     )
             ) {
                 //victory
+                uint256 winnings = (victoryTransferBps *
+                    entityStoreERC20.getStoredER20WadFor(
+                        gang,
+                        defenderGangId,
+                        bandit
+                    )) / 10000;
                 entityStoreERC20.transfer(
                     gang,
                     defenderGangId,
                     gang,
                     attackerGangId,
                     bandit,
-                    (victoryTransferBps *
-                        entityStoreERC20.getStoredER20WadFor(
-                            gang,
-                            defenderGangId,
-                            bandit
-                        )) / 10000
+                    winnings
                 );
+                attack.winnings = winnings;
                 _haltGangProduction(defenderGangId);
                 _startGangProduction(defenderGangId);
             } else {
@@ -483,6 +498,7 @@ contract LocTemplateResource is LocationBase {
         view
         returns (ShopItem[] memory items)
     {
+        items = new ShopItem[](shopItemKeys.length());
         for (uint i; i < shopItemKeys.length(); i++) {
             items[i] = (shopItems[shopItemKeys.at(i)]);
         }
@@ -496,6 +512,26 @@ contract LocTemplateResource is LocationBase {
         uint256 index
     ) public view returns (ShopItem memory) {
         return shopItems[shopItemKeys.at(index)];
+    }
+
+    //High gas usage, view only
+    function viewOnly_getAllAttackLog()
+        external
+        view
+        returns (Attack[] memory attacks)
+    {
+        attacks = new Attack[](attackLogNextUid.current());
+        for (uint i; i < attackLogNextUid.current(); i++) {
+            attacks[i] = attackLog[i];
+        }
+    }
+
+    function getAttackLogLength() public view returns (uint256) {
+        return attackLogNextUid.current();
+    }
+
+    function getAttackAt(uint256 index) public view returns (Attack memory) {
+        return attackLog[index];
     }
 
     function setRandomDestinations(

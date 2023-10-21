@@ -518,6 +518,10 @@ describe("LocTemplateResource", function () {
         const player1GangPull = await resourceLocations[0].gangPull(player1GangId);
         const player2GangPull = await resourceLocations[0].gangPull(player2GangId);
         const player3GangPull = await resourceLocations[0].gangPull(player3GangId);
+        const attackLogLength = await resourceLocations[0].getAttackLogLength();
+        const attackAt0 = await resourceLocations[0].getAttackAt(0);
+        const attackLog = await resourceLocations[0].viewOnly_getAllAttackLog();
+        const attack = attackLog[0];
         expect(gang1Bandits).to.eq(expectedFinalGang1Bal);
         expect(gang3Bandits).to.eq(expectedFinalGang3Bal);
         expect(gangLastAttack).to.eq(0);
@@ -525,5 +529,11 @@ describe("LocTemplateResource", function () {
         expect(player1GangPull).to.eq(expectedFinalGang1Bal.mul(10000 + 2500 + 1000).div(10000));
         expect(player2GangPull).to.eq(parseEther("250").mul(10000 + 5000 + 2000).div(10000));
         expect(player3GangPull).to.eq(expectedFinalGang3Bal.mul(10000 + 40000 + 4000).div(10000));
+        expect(attackLogLength).to.eq(1);
+        expect(attackAt0.attackerGangId).to.eq(player3GangId);
+        expect(attack.attackerGangId).to.eq(player3GangId);
+        expect(attack.defenderGangId).to.eq(player1GangId);
+        expect(attack.cost).to.eq(expectedBurnAmt);
+        expect(attack.winnings).to.eq(expectedWinAmt);
     });
 });
