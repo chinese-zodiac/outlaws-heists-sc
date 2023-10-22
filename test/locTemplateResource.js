@@ -217,7 +217,7 @@ describe("LocTemplateResource", function () {
         expect(currentProdDaily1).to.eq(parseEther("2"));
         expect(currentProdDaily2).to.eq(parseEther("1"));
     });
-    it("Should set/delete item in shop by manager", async function () {
+    /*it("Should set/delete item in shop by manager", async function () {
         await resourceLocations[0].addItemToShop(
             itemTokens[0].address,
             CZUSD,
@@ -303,7 +303,7 @@ describe("LocTemplateResource", function () {
         expect(shopItem0Phase3.increasePerItemSold).to.eq(parseEther("1.2"));
         expect(shopItem0Phase3.totalSold).to.eq(0);
         expect(shopItemCountPhase3).to.eq(1);
-    });
+    });*/
     it("Should set/delete fixed destionations", async function () {
         await resourceLocations[0].setFixedDestinations([TownSquare], true);
         const countPhase0 = await resourceLocations[0].getFixedDestinationsCount();
@@ -319,7 +319,7 @@ describe("LocTemplateResource", function () {
         expect(countPhase1).to.eq(0);
         await expect(resourceLocations[0].connect(player1).setFixedDestinations([ethers.constants.AddressZero], true)).to.be.reverted;
     });
-    it("Should set/delete random destionations", async function () {
+    /*it("Should set/delete random destionations", async function () {
         await resourceLocations[0].setRandomDestinations([resourceLocations[1].address, resourceLocations[2].address], true);
         const countPhase0 = await resourceLocations[0].getRandomDestinationsCount();
         const index0Phase0 = await resourceLocations[0].getRandomDestinationAt(0);
@@ -335,7 +335,7 @@ describe("LocTemplateResource", function () {
         expect(index1Phase0).to.eq(resourceLocations[2].address);
         expect(countPhase1).to.eq(0);
         await expect(resourceLocations[0].connect(player1).setFixedDestinations([ethers.constants.AddressZero], true)).to.be.reverted;
-    });
+    });*/
     it("Should allow move from town to location 0", async function () {
         const player1GangId = await gangs.tokenOfOwnerByIndex(player1.address, 0);
         await locationController.connect(player1).move(gangs.address, player1GangId, resourceLocations[0].address);

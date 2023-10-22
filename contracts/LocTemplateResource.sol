@@ -25,24 +25,12 @@ contract LocTemplateResource is LocationBase {
     using Timers for Timers.Timestamp;
     using SafeERC20 for IERC20;
 
-    struct ShopItem {
-        TokenBase item;
-        TokenBase currency;
-        uint256 pricePerItemWad;
-        uint256 increasePerItemSold;
-        uint256 totalSold;
-    }
-
     bytes32 public constant BOOSTER_GANG_PULL =
         keccak256(abi.encodePacked("BOOSTER_GANG_PULL"));
     bytes32 public constant BOOSTER_GANG_PROD_DAILY =
         keccak256(abi.encodePacked("BOOSTER_GANG_PROD_DAILY"));
     bytes32 public constant BOOSTER_GANG_POWER =
         keccak256(abi.encodePacked("BOOSTER_GANG_POWER"));
-
-    EnumerableSet.UintSet shopItemKeys;
-    Counters.Counter shopItemNextUid;
-    mapping(uint256 => ShopItem) public shopItems;
 
     EntityStoreERC20 public entityStoreERC20;
 
@@ -91,7 +79,6 @@ contract LocTemplateResource is LocationBase {
     mapping(uint256 => Attack) attackLog;
     Counters.Counter attackLogNextUid;
 
-    EnumerableSet.AddressSet randomDestinations;
     EnumerableSet.AddressSet fixedDestinations;
 
     constructor(
@@ -128,57 +115,6 @@ contract LocTemplateResource is LocationBase {
     modifier onlyGangOwner(uint256 gangId) {
         require(msg.sender == gang.ownerOf(gangId), "Only gang owner");
         _;
-    }
-
-    function depositERC20(
-        uint256 gangId,
-        IERC20 token,
-        uint256 wad
-    ) external onlyGangOwner(gangId) {
-        require(token != bandit, "Cannot deposit bandits");
-        token.safeTransferFrom(msg.sender, address(this), wad);
-        token.approve(address(entityStoreERC20), wad);
-        entityStoreERC20.deposit(
-            gang,
-            gangId,
-            token,
-            token.balanceOf(address(this))
-        );
-        _haltGangProduction(gangId);
-        _startGangProduction(gangId);
-    }
-
-    function withdrawERC20(
-        uint256 gangId,
-        IERC20 token,
-        uint256 wad
-    ) external onlyGangOwner(gangId) {
-        require(token != bandit, "Cannot withdraw bandits");
-        entityStoreERC20.withdraw(gang, gangId, token, wad);
-        token.safeTransfer(msg.sender, token.balanceOf(address(this)));
-        _haltGangProduction(gangId);
-        _startGangProduction(gangId);
-    }
-
-    function buyShopItem(
-        uint256 gangId,
-        uint256 shopItemId,
-        uint256 quantity
-    ) external onlyLocalEntity(gang, gangId) {
-        ShopItem memory item = shopItems[shopItemId];
-        entityStoreERC20.burn(
-            gang,
-            gangId,
-            item.currency,
-            (quantity *
-                (item.pricePerItemWad +
-                    item.totalSold *
-                    item.increasePerItemSold)) / 1 ether
-        );
-        item.item.mint(address(this), quantity);
-        item.totalSold += quantity;
-        item.item.approve(address(entityStoreERC20), quantity);
-        entityStoreERC20.deposit(gang, gangId, item.item, quantity);
     }
 
     function claimPendingResources(
@@ -318,14 +254,6 @@ contract LocTemplateResource is LocationBase {
         _prepareMove(gangId);
     }
 
-    function prepareToMoveGangToRandomLocation(
-        uint256 gangId
-    ) external onlyLocalEntity(gang, gangId) onlyGangOwner(gangId) {
-        //since move is to a random resource location, the destination should be kept blank.
-        gangMovementPreparations[gangId].destination = ILocation(address(0x0));
-        _prepareMove(gangId);
-    }
-
     function _prepareMove(uint256 gangId) internal {
         gangMovementPreparations[gangId].readyTimer.setDeadline(
             uint64(block.timestamp + travelTime)
@@ -407,33 +335,7 @@ contract LocTemplateResource is LocationBase {
     }
 
     function gangDestination(uint256 gangId) public view returns (ILocation) {
-        if (
-            gangMovementPreparations[gangId].destination !=
-            ILocation(address(0x0))
-        ) {
-            //If a destination was set, go there
-            return gangMovementPreparations[gangId].destination;
-        }
-        //If the gang isn't ready, it cant go anywhere
-        if (!isGangReadyToMove(gangId)) {
-            return ILocation(address(0x0));
-        }
-        //If the gang is ready, and not going to a set destination, pick a random destination from the list
-        bytes32 randWord = keccak256(
-            abi.encodePacked(
-                rngHistory.getAtOrAfterTimestamp(
-                    gangMovementPreparations[gangId].readyTimer.getDeadline()
-                ),
-                gang,
-                gangId
-            )
-        );
-        return
-            ILocation(
-                getRandomDestinationAt(
-                    uint256(randWord) % (getRandomDestinationsCount() - 1)
-                )
-            );
+        return gangMovementPreparations[gangId].destination;
     }
 
     function isGangPreparingToMove(uint256 gangId) public view returns (bool) {
@@ -459,23 +361,6 @@ contract LocTemplateResource is LocationBase {
     }
 
     //High gas usage, view only
-    function viewOnly_getAllRandomDestinations()
-        external
-        view
-        returns (address[] memory destinations_)
-    {
-        destinations_ = randomDestinations.values();
-    }
-
-    function getRandomDestinationsCount() public view returns (uint256) {
-        return randomDestinations.length();
-    }
-
-    function getRandomDestinationAt(uint256 _i) public view returns (address) {
-        return randomDestinations.at(_i);
-    }
-
-    //High gas usage, view only
     function viewOnly_getAllFixedDestinations()
         external
         view
@@ -490,28 +375,6 @@ contract LocTemplateResource is LocationBase {
 
     function getFixedDestinationAt(uint256 _i) public view returns (address) {
         return fixedDestinations.at(_i);
-    }
-
-    //High gas usage, view only
-    function viewOnly_getAllShopItems()
-        external
-        view
-        returns (ShopItem[] memory items)
-    {
-        items = new ShopItem[](shopItemKeys.length());
-        for (uint i; i < shopItemKeys.length(); i++) {
-            items[i] = (shopItems[shopItemKeys.at(i)]);
-        }
-    }
-
-    function getShopItemsCount() public view returns (uint256) {
-        return shopItemKeys.length();
-    }
-
-    function getShopItemAt(
-        uint256 index
-    ) public view returns (ShopItem memory) {
-        return shopItems[shopItemKeys.at(index)];
     }
 
     //High gas usage, view only
@@ -532,25 +395,6 @@ contract LocTemplateResource is LocationBase {
 
     function getAttackAt(uint256 index) public view returns (Attack memory) {
         return attackLog[index];
-    }
-
-    function setRandomDestinations(
-        address[] calldata _destinations,
-        bool isDestination
-    ) public onlyRole(MANAGER_ROLE) {
-        if (isDestination) {
-            for (uint i; i < _destinations.length; i++) {
-                randomDestinations.add(_destinations[i]);
-                validDestinations.add(_destinations[i]);
-                validSources.add(_destinations[i]);
-            }
-        } else {
-            for (uint i; i < _destinations.length; i++) {
-                randomDestinations.remove(_destinations[i]);
-                validDestinations.remove(_destinations[i]);
-                validSources.remove(_destinations[i]);
-            }
-        }
     }
 
     function setFixedDestinations(
@@ -611,48 +455,6 @@ contract LocTemplateResource is LocationBase {
 
     function setTravelTime(uint64 to) external onlyRole(MANAGER_ROLE) {
         travelTime = to;
-    }
-
-    function addItemToShop(
-        TokenBase item,
-        TokenBase currency,
-        uint256 pricePerItemWad,
-        uint256 increasePerItemSold
-    ) external onlyRole(MANAGER_ROLE) {
-        uint256 id = shopItemNextUid.current();
-        shopItemKeys.add(id);
-        shopItems[id].item = item;
-        shopItems[id].currency = currency;
-        shopItems[id].pricePerItemWad = pricePerItemWad;
-        shopItems[id].increasePerItemSold = increasePerItemSold;
-        shopItemNextUid.increment();
-    }
-
-    function setItemInShop(
-        uint256 index,
-        TokenBase item,
-        TokenBase currency,
-        uint256 pricePerItemWad,
-        uint256 increasePerItemSold
-    ) external onlyRole(MANAGER_ROLE) {
-        require(shopItemKeys.length() > index, "index not in shop");
-        uint256 id = shopItemKeys.at(index);
-        shopItems[id].item = item;
-        shopItems[id].currency = currency;
-        shopItems[id].pricePerItemWad = pricePerItemWad;
-        shopItems[id].increasePerItemSold = increasePerItemSold;
-    }
-
-    function deleteItemFromShop(uint256 index) external onlyRole(MANAGER_ROLE) {
-        require(shopItemKeys.length() > index, "index not in shop");
-        uint256 id = shopItemKeys.at(index);
-        delete shopItems[id].item;
-        delete shopItems[id].currency;
-        delete shopItems[id].pricePerItemWad;
-        delete shopItems[id].increasePerItemSold;
-        delete shopItems[id].totalSold;
-        delete shopItems[id];
-        shopItemKeys.remove(id);
     }
 
     function setBaseResourcesPerDay(
